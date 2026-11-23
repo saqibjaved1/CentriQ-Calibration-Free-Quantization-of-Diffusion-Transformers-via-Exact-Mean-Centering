@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CentriQ</title>
+<meta name="description" content="CentriQ: calibration-free 4-bit quantization of diffusion transformers via exact mean centering.">
+<meta property="og:title" content="CentriQ: Calibration-Free Quantization of Diffusion Transformers via Exact Mean Centering">
+<meta property="og:description" content="Center each token, rotate, quantize to 4 bits, and restore the mean exactly. No calibration data. Matches calibrated SVDQuant on FLUX, SANA and PixArt-Σ.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  --ink:#0d1b1e; --ink-2:#3a4a4f; --muted:#6b7b80; --line:#e3e8ea;
+  --bg:#ffffff; --bg-2:#f5f8f8; --card:#ffffff;
+  --accent:#e2601b; --accent-soft:#fdeee5;   /* the full-precision rank-1 branch (orange, as in the paper) */
+  --int4:#1673b8; --int4-soft:#e6f1fa;       /* the INT4 path (blue, as in the paper) */
+  --hero-1:#071518; --hero-2:#0e2a2f;
+  --radius:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#e8eef0; --ink-2:#c2ced2; --muted:#8fa0a5; --line:#24343a;
+    --bg:#0b1416; --bg-2:#0f1c1f; --card:#122226;
+    --accent:#f07a3a; --accent-soft:#2c1c12; --int4:#4fa3e0; --int4-soft:#0f2433;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e8eef0; --ink-2:#c2ced2; --muted:#8fa0a5; --line:#24343a;
+  --bg:#0b1416; --bg-2:#0f1c1f; --card:#122226;
+  --accent:#f07a3a; --accent-soft:#2c1c12; --int4:#4fa3e0; --int4-soft:#0f2433;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+img{max-width:100%;display:block}
+a{color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.narrow{max-width:760px;margin:0 auto}
+@media (max-width:600px){.wrap{padding:0 16px}}
+
+/* ---------- hero ---------- */
+.hero{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
+  background:radial-gradient(1200px 700px at 50% 30%, #143a40 0%, var(--hero-2) 45%, var(--hero-1) 100%);color:#eaf4f3;overflow:hidden;padding:96px 16px 72px}
+#bars{position:absolute;inset:auto 0 0 0;width:100%;height:46%;opacity:.55;pointer-events:none}
+.hero > *:not(canvas):not(.scroll-cue){position:relative;z-index:1}
+.venue{display:inline-block;font:500 12px/1 Inter;letter-spacing:.14em;text-transform:uppercase;color:#9fc7c3;border:1px solid #2c5258;border-radius:999px;padding:8px 14px;margin-bottom:28px}
+.wordmark{font-family:"Instrument Serif",serif;font-weight:400;font-size:clamp(76px,15vw,168px);line-height:.9;margin:0;letter-spacing:-.02em;
+  background:linear-gradient(180deg,#ffffff 0%,#cfe6e2 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.wordmark em{font-style:italic;color:var(--accent);-webkit-text-fill-color:#f2834a}
+.subtitle{font-size:clamp(18px,2.4vw,24px);font-weight:500;margin:22px auto 0;max-width:760px;color:#e2efed}
+.tagline{font-size:15px;color:#9fbdb9;margin-top:10px}
+.authors{margin-top:30px;font-size:17px;display:flex;gap:6px 26px;justify-content:center;flex-wrap:wrap}
+.authors a{text-decoration:none;border-bottom:1px solid #3f6a6f}
+.authors sup{color:#9fc7c3;margin-left:1px}
+.affil{margin-top:8px;font-size:14px;color:#9fbdb9}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;background:#eaf4f3;color:#0b1d20;text-decoration:none;font-weight:600;font-size:14px;transition:transform .15s,background .15s}
+.btn:hover{transform:translateY(-1px);background:#fff}
+.btn.ghost{background:transparent;color:#eaf4f3;border:1px solid #3f6a6f}
+.btn .soon{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:#f2834a;color:#1b0d05;border-radius:999px;padding:2px 7px}
+.btn svg{width:16px;height:16px}
+.scroll-cue{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);font-size:12px;color:#7fa39f;letter-spacing:.1em;text-transform:uppercase;z-index:1}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:-48px;position:relative;z-index:2;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 20px 50px -25px rgba(0,0,0,.35)}
+.stat{padding:24px 22px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat b{display:block;font-family:"Instrument Serif",serif;font-weight:400;font-size:44px;line-height:1;color:var(--ink)}
+.stat b small{font-size:22px}
+.stat span{display:block;margin-top:8px;font-size:13.5px;color:var(--muted);line-height:1.45}
+@media (max-width:820px){.stats{grid-template-columns:1fr 1fr}.stat:nth-child(2){border-right:0}.stat:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+
+/* ---------- sections ---------- */
+section{padding:96px 0}
+section.alt{background:var(--bg-2)}
+.eyebrow{font:600 12px/1 Inter;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+h2{font-family:"Instrument Serif",serif;font-weight:400;font-size:clamp(34px,5vw,52px);line-height:1.05;margin:0 0 18px;letter-spacing:-.01em}
+h3{font-size:18px;margin:0 0 6px}
+p.lead{font-size:18px;color:var(--ink-2)}
+.center{text-align:center}
+.muted{color:var(--muted)}
+.caption{font-size:13.5px;color:var(--muted);margin-top:12px;line-height:1.5}
+figure{margin:0}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.figimg{background:#fff;border-radius:12px;padding:14px}
+
+/* ---------- comparison ---------- */
+.tabs{display:inline-flex;gap:4px;background:var(--bg-2);border:1px solid var(--line);border-radius:999px;padding:4px}
+section.alt .tabs{background:var(--card)}
+.tab{border:0;background:transparent;color:var(--ink-2);font:600 14px Inter;padding:9px 16px;border-radius:999px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.tab{white-space:nowrap}
+@media (max-width:600px){
+  .tab{padding:8px 11px;font-size:13px}
+  .vs{flex-wrap:wrap}
+  .stat{padding:18px 14px}.stat b{font-size:36px}
+}
+.cmp-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:34px 0 16px}
+.vs{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.cmp-grid{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:18px;align-items:start}
+@media (max-width:820px){.cmp-grid{grid-template-columns:1fr}}
+.slider{position:relative;aspect-ratio:1/1;border-radius:14px;overflow:hidden;user-select:none;touch-action:none;cursor:ew-resize;background:#111}
+.slider img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.slider .top{clip-path:inset(0 0 0 var(--pos,50%))}
+.slider .handle{position:absolute;top:0;bottom:0;left:var(--pos,50%);width:2px;background:#fff;transform:translateX(-1px);box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+.slider .knob{position:absolute;top:50%;left:50%;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.35);color:#0d1b1e;font-weight:700;font-size:14px}
+.slider .lbl{position:absolute;top:12px;padding:5px 10px;border-radius:8px;font:600 12px Inter;background:rgba(0,0,0,.6);color:#fff;backdrop-filter:blur(4px)}
+.slider .lbl.l{left:12px}.slider .lbl.r{right:12px}
+.slider .lbl.ours{background:var(--accent);color:#1b0d05}
+.thumbs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:820px){.thumbs{grid-template-columns:repeat(4,1fr)}}
+.thumb{padding:0;border:2px solid transparent;border-radius:10px;overflow:hidden;cursor:pointer;background:none;aspect-ratio:1/1}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb[aria-pressed="true"]{border-color:var(--accent)}
+.triple{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.triple figure{position:relative}
+.triple img{border-radius:10px;aspect-ratio:1/1;object-fit:cover;width:100%}
+.triple figcaption{font-size:12.5px;text-align:center;margin-top:6px;color:var(--muted)}
+.triple figcaption b{color:var(--ink)}
+
+/* ---------- method ---------- */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px}
+@media (max-width:820px){.steps{grid-template-columns:1fr}}
+.step{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.step .n{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;margin-bottom:14px}
+.step.c .n{background:var(--accent-soft);color:var(--accent)}
+.step.r .n,.step.q .n{background:var(--int4-soft);color:var(--int4)}
+.step p{margin:0;color:var(--ink-2);font-size:15px}
+.eq{margin:30px 0 6px;padding:22px;border-radius:var(--radius);background:var(--card);border:1px solid var(--line);overflow-x:auto;text-align:center;font-size:19px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:center}
+@media (max-width:820px){.two{grid-template-columns:1fr}}
+.key{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+
+/* ---------- token demo ---------- */
+.demo{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.demo canvas{width:100%;height:240px;display:block}
+.demo-ctl{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{border:1px solid var(--line);background:var(--bg-2);color:var(--ink-2);font:600 13px Inter;padding:7px 12px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.demo-read{display:flex;gap:20px;flex-wrap:wrap;font-size:13.5px;color:var(--muted);margin-top:10px}
+.demo-read b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;font-variant-numeric:tabular-nums}
+th,td{padding:11px 14px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--bg-2)}
+tr:last-child td{border-bottom:0}
+tr.ours td{background:var(--accent-soft);font-weight:600}
+tr.ref td{color:var(--muted)}
+td.bad{color:#b8473b}
+.pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:1px}
+.pill.y{background:#fde8e6;color:#a8382c}.pill.n{background:#e3f4ea;color:#21794a}
+:root[data-theme="dark"] .pill.y,:root:not([data-theme="light"]) .pill.y{}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.y{background:#3a1c18;color:#f3a297}:root:not([data-theme="light"]) .pill.n{background:#15301f;color:#8fd8aa}}
+
+/* ---------- latency bars ---------- */
+.bars{margin-top:20px;display:grid;gap:12px}
+.bar-row{display:grid;grid-template-columns:150px 1fr 70px;align-items:center;gap:12px;font-size:14px}
+.bar-track{height:28px;background:var(--bg-2);border-radius:8px;overflow:hidden}
+.bar{height:100%;border-radius:8px;background:#9aa9ad;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.bar.svd{background:var(--int4)}
+.bar.ours{background:var(--accent)}
+.bar-row .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+@media (max-width:600px){.bar-row{grid-template-columns:96px 1fr 56px;font-size:13px}}
+
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+@media (max-width:700px){.kpis{grid-template-columns:1fr}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.kpi b{font-family:"Instrument Serif",serif;font-weight:400;font-size:34px;line-height:1;display:block}
+.kpi span{font-size:13.5px;color:var(--muted)}
+
+/* ---------- bibtex / footer ---------- */
+pre.bib{background:var(--hero-1);color:#d6ebe8;padding:22px;border-radius:14px;overflow-x:auto;font:13.5px/1.6 "JetBrains Mono",monospace;position:relative}
+.copy{position:absolute;top:12px;right:12px;border:1px solid #2c5258;background:#0e2a2f;color:#d6ebe8;border-radius:8px;padding:6px 10px;font:600 12px Inter;cursor:pointer}
+footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border-top:1px solid var(--line)}
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion: reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+
+/* ---------- v2: diagram + charts ---------- */
+:root{--gray-mark:#9aa9ad;--grid:#e6ebec;--tip-bg:#0d1b1e;--tip-ink:#f2f6f6}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--gray-mark:#6f8287;--grid:#1f3036;--tip-bg:#e8eef0;--tip-ink:#0d1b1e}}
+:root[data-theme="dark"]{--gray-mark:#6f8287;--grid:#1f3036;--tip-bg:#e8eef0;--tip-ink:#0d1b1e}
+.diagram{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 10px;overflow-x:auto}
+.diagram svg{display:block;width:100%;min-width:720px;height:auto;font-family:Inter,system-ui,sans-serif}
+.dg-lane{fill:var(--bg-2);stroke:var(--line)}
+.dg-lane-l{font-size:12px;font-style:italic;fill:var(--muted)}
+.dg-box{fill:var(--card);stroke-width:1.6;rx:10}
+.dg-box.q{stroke:var(--int4)} .dg-box.fp{stroke:var(--accent)} .dg-box.io{stroke:var(--ink-2)}
+.dg-t{font-size:14px;fill:var(--ink);text-anchor:middle;dominant-baseline:middle}
+.dg-s{font-size:11.5px;fill:var(--muted);text-anchor:middle;dominant-baseline:middle}
+.dg-v{font-size:15px;fill:var(--ink);font-style:italic}
+.dg-w{stroke:var(--int4);stroke-width:2;fill:none}
+.dg-io{stroke:var(--ink-2);stroke-width:1.6;fill:none}
+.dg-fp{stroke:var(--accent);stroke-width:2;fill:none;stroke-dasharray:7 6;animation:dgflow 1.4s linear infinite}
+.dg-pulse{fill:var(--int4)} .dg-pulse.fp{fill:var(--accent)}
+@keyframes dgflow{to{stroke-dashoffset:-26}}
+@media (prefers-reduced-motion: reduce){.dg-fp{animation:none}.dg-pulse{display:none}}
+.dg-legend{display:flex;gap:22px;flex-wrap:wrap;font-size:13px;color:var(--ink-2);margin:6px 4px 4px}
+.dg-legend i{display:inline-block;width:22px;height:0;border-top:2px solid;margin-right:8px;vertical-align:middle}
+.chart-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.chart-head h3{font-size:16px;margin:0}
+.chart-head p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.multiples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:8px}
+@media (max-width:820px){.multiples{grid-template-columns:1fr}}
+.multiples svg{width:100%;height:auto;display:block;overflow:visible;font-family:Inter,system-ui,sans-serif}
+.panel-t{font-size:13px;font-weight:600;fill:var(--ink)}
+.ax{font-size:11px;fill:var(--muted)}
+.lbl{font-size:12px;fill:var(--ink-2)}
+.val{font-size:11.5px;fill:var(--ink);font-variant-numeric:tabular-nums}
+.gridl{stroke:var(--grid);stroke-width:1}
+.refl{stroke:var(--ink-2);stroke-width:1.5;stroke-dasharray:4 4}
+.hit{fill:transparent;cursor:default}
+.hit:focus{outline:none}
+.mk{transition:r .12s}
+g.row:hover .mk, g.row:focus-within .mk{r:7}
+.chart-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.chart-legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0;background:var(--c)}
+.tip{position:fixed;pointer-events:none;background:var(--tip-bg);color:var(--tip-ink);font:12px/1.4 Inter,sans-serif;padding:8px 10px;border-radius:8px;z-index:50;opacity:0;transition:opacity .1s;max-width:240px}
+.tip b{font-size:14px;display:block}
+.linkbtn{border:1px solid var(--line);background:var(--bg-2);color:var(--ink-2);font:600 12.5px Inter;padding:6px 11px;border-radius:999px;cursor:pointer}
+</style>
+</head>
+<body>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <canvas id="bars" aria-hidden="true"></canvas>
+  <span class="venue">Calibration-free · W4A4 · Diffusion Transformers</span>
+  <h1 class="wordmark">Centri<em>Q</em></h1>
+  <p class="subtitle">Calibration-Free Quantization of Diffusion Transformers via Exact Mean Centering</p>
+  <p class="tagline">Center every token. Rotate. Quantize to 4 bits. Put the mean back exactly.</p>
+  <div class="authors">
+    <span>Nataša Jovanović<sup>1,2</sup></span>
+    <span>Mathieu Salzmann<sup>2</sup></span>
+    <span>Saqib Javed<sup>2</sup></span>
+  </div>
+  <div class="affil"><sup>1</sup>Tenstorrent &nbsp;·&nbsp; <sup>2</sup>EPFL</div>
+  <div class="btns">
+    <a class="btn" href="https://arxiv.org/pdf/2610.06260"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Paper</a>
+    <a class="btn ghost" href="https://arxiv.org/abs/2610.06260"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l16 16M20 4L4 20"/></svg>arXiv</a>
+    <a class="btn ghost" href="#" aria-disabled="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>Code <span class="soon">soon</span></a>
+    <a class="btn ghost" href="#bibtex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h4v4H7zM13 7h4v4h-4zM7 11c0 3-1 5-3 6M13 11c0 3-1 5-3 6"/></svg>BibTeX</a>
+  </div>
+  <div class="scroll-cue">Scroll</div>
+</header>
+
+<!-- ================= STATS ================= -->
+<div class="wrap">
+  <div class="stats reveal">
+    <div class="stat"><b>0</b><span>calibration prompts. Scales and the mean are computed in closed form, per token, at inference.</span></div>
+    <div class="stat"><b>9.3<small> min</small></b><span>to convert FLUX.1-schnell, vs 13.0 h for our SVDQuant calibration run.</span></div>
+    <div class="stat"><b>≤3.5<small>%</small></b><span>latency gap to SVDQuant in the same fused 4-bit engine.</span></div>
+    <div class="stat"><b>3</b><span>DiT families at W4A4: FLUX.1-schnell, SANA-1.6B, PixArt-Σ.</span></div>
+  </div>
+</div>
+
+<!-- ================= COMPARISON ================= -->
+<section id="compare">
+  <div class="wrap">
+    <div class="narrow center reveal">
+      <div class="eyebrow">See for yourself</div>
+      <h2>4-bit weights. 4-bit activations.<br>No calibration data.</h2>
+      <p class="lead">Drag across the image. Every pair shares the prompt, seed, scheduler and step count, so differences come only from quantization.</p>
+    </div>
+
+    <div class="cmp-head reveal">
+      <div class="tabs" role="tablist" aria-label="Model">
+        <button class="tab" role="tab" data-model="pixart" aria-selected="true">PixArt-Σ</button>
+        <button class="tab" role="tab" data-model="flux" aria-selected="false">FLUX.1-schnell</button>
+        <button class="tab" role="tab" data-model="sana" aria-selected="false">SANA-1.6B</button>
+      </div>
+      <div class="vs">Compare CentriQ with
+        <div class="tabs" role="group" aria-label="Left image" id="leftTabs"></div>
+      </div>
+    </div>
+
+    <div class="cmp-grid reveal">
+      <div>
+        <div class="slider" id="slider" style="--pos:50%">
+          <img id="imgL" alt="">
+          <img id="imgR" class="top" alt="">
+          <div class="handle"><div class="knob">⇆</div></div>
+          <span class="lbl l" id="lblL">BF16</span>
+          <span class="lbl r ours">CentriQ W4A4</span>
+        </div>
+        <div class="triple" id="triple"></div>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+    <p class="caption">All methods use 4-bit weights and activations. ConvRot-style, HadaNorm-style and rotation-only replace CentriQ's activation path with the same RoDS weights, grid and clip (our reimplementations, as in the paper's controlled comparison). SVDQuant is calibrated on COCO prompts and keeps a 16-bit low-rank branch; on FLUX.1-schnell we use its official public checkpoint (NVFP4), on SANA-1.6B its reported setup. CentriQ uses no data. FLUX.1-schnell runs 4 steps; SANA-1.6B and PixArt-Σ run 20.</p>
+  </div>
+</section>
+
+<!-- ================= PROBLEM ================= -->
+<section class="alt" id="problem">
+  <div class="wrap">
+    <div class="two">
+      <div class="reveal">
+        <div class="eyebrow">The problem</div>
+        <h2>Calibration-free 4-bit DiTs usually collapse</h2>
+        <p class="lead">Methods that reach W4A4 on diffusion models rely on calibration: smoothing factors, clipping ranges or low-rank corrections fitted to prompts run through one specific checkpoint. Repeat it for every model, fine-tune and bit-width.</p>
+        <p class="muted">Without calibration, plain round-to-nearest and HQQ produce noise on PixArt-Σ and lose the prompt on FLUX.1-schnell and SANA-1.6B. CentriQ stays close to the 16-bit output on all three.</p>
+      </div>
+      <figure class="reveal">
+        <div class="figimg"><img src="assets/img/fig_collapse.png" alt="W4A4 samples from FP16, RTN, HQQ and CentriQ on PixArt-Sigma, FLUX.1-schnell and SANA-1.6B. RTN and HQQ produce noise or lose the prompt; CentriQ matches FP16." loading="lazy"></div>
+        <figcaption class="caption">W4A4 with calibration-free quantizers. RTN and HQQ break; CentriQ matches the 16-bit image.</figcaption>
+      </figure>
+    </div>
+    <div class="chart-card reveal" style="margin-top:40px">
+      <div class="chart-head">
+        <div><h3>W4A4 image quality, MJHQ FID (lower is better, log scale)</h3>
+        <p>Dashed line: the 16-bit model. Hover a dot for its value.</p></div>
+        <div class="chart-legend"><span style="--c:var(--gray-mark)">RTN, NF4, HQQ (no data)</span><span style="--c:var(--int4)">SVDQuant (calibrated)</span><span style="--c:var(--accent)">CentriQ (no data)</span></div>
+      </div>
+      <div class="multiples" id="fidChart" role="img" aria-label="Dot plot of W4A4 FID per method for PixArt-Sigma, FLUX.1-schnell and SANA-1.6B"></div>
+      <p class="caption" style="margin-bottom:0">Values from the paper's main W4A4 table; SVDQuant numbers as reported by its authors.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= INSIGHT ================= -->
+<section id="insight">
+  <div class="wrap">
+    <div class="narrow center reveal">
+      <div class="eyebrow">The insight</div>
+      <h2>A hidden mean survives the rotation</h2>
+      <p class="lead">Adaptive LayerNorm shifts every token by a conditioning-dependent offset, so each activation carries a per-token mean. Hadamard rotation, the standard data-free tool for spreading outliers, cannot spread this mean at DiT widths (1152, 2240, 3072). It piles it onto one coordinate, and that spike sets the 4-bit step for the whole token.</p>
+    </div>
+
+    <div class="two" style="margin-top:44px">
+      <div class="demo reveal">
+        <div class="demo-ctl" role="group" aria-label="Transform">
+          <button class="chip" data-mode="raw" aria-pressed="false">No transform</button>
+          <button class="chip" data-mode="rot" aria-pressed="true">Rotation only</button>
+          <button class="chip" data-mode="cen" aria-pressed="false">Centering + rotation</button>
+        </div>
+        <canvas id="token" aria-label="Illustration of one token's coordinate magnitudes and the resulting 4-bit grid"></canvas>
+        <div class="demo-read"><span>Largest coordinate: <b id="rMax">–</b></span><span>4-bit step: <b id="rStep">–</b></span><span>Grid resolution vs rotation only: <b id="rGain">–</b></span></div>
+        <p class="caption" style="margin-bottom:0">Toy illustration of one token (sorted magnitudes). Dashed lines mark the INT4 grid levels set by the largest coordinate.</p>
+      </div>
+      <figure class="reveal">
+        <div class="figimg"><img src="assets/img/sorted_magnitudes.png" alt="Sorted coordinate magnitudes of one real token: rotation leaves a DC spike; centering plus rotation removes it, giving a 2.4x finer INT4 step." loading="lazy"></div>
+        <figcaption class="caption">Measured on a real FLUX token. Rotation alone leaves the DC coordinate on top; centering removes it, and the INT4 step becomes <b>2.4× finer</b>.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================= METHOD ================= -->
+<section class="alt" id="method">
+  <div class="wrap">
+    <div class="narrow center reveal">
+      <div class="eyebrow">The method</div>
+      <h2>Center, rotate, restore exactly</h2>
+      <p class="lead">Because a linear layer is linear, the mean can be taken out before quantization and added back afterwards with no error.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step c reveal"><div class="n">1</div><h3>Center each token</h3><p>Subtract the per-token mean $\bar{x}_t$, at $O(n)$ cost, in the same kernel launch that computes the scale.</p></div>
+      <div class="step r reveal"><div class="n">2</div><h3>Rotate &amp; quantize</h3><p>A fixed factorized Hadamard rotation mixes the centered token. One closed-form scale per token, shared clip settings across all models.</p></div>
+      <div class="step q reveal"><div class="n">3</div><h3>Restore the mean</h3><p>The mean re-enters as an exact full-precision rank-1 term $\bar{x}_t\,\mathbf{w}_{\mathbf{1}}$, fused into the GEMM epilogue.</p></div>
+    </div>
+
+    <div class="eq reveal">$$\mathbf{y}_t \;=\; \textcolor{#1673b8}{\widehat{W}_{R}\;Q_a\!\big(HP\,(\mathbf{x}_t-\bar{x}_t\mathbf{1})\big)} \;+\; \textcolor{#e2601b}{\bar{x}_t\,W\mathbf{1}} \;+\; \mathbf{b}$$</div>
+    <p class="caption center reveal"><span class="key" style="background:var(--int4)"></span>4-bit path &nbsp;&nbsp; <span class="key" style="background:var(--accent)"></span>full-precision rank-1 branch, which bypasses both quantizers</p>
+
+    <figure class="reveal" style="margin-top:36px">
+      <div class="diagram">
+        <svg viewBox="0 0 980 370" role="img" aria-label="One CentriQ linear layer. Online, per token: x is centered, padded and rotated, quantized to INT4 with a closed-form scale, and multiplied in an INT4 GEMM; the epilogue adds the mean times W times one plus the bias. Offline: W is fitted by the l_p solver into a packed INT4 rotated weight, and its row sums W1 are stored in full precision.">
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker></defs>
+          <rect class="dg-lane" x="8" y="8" width="964" height="160" rx="14"/>
+          <text class="dg-lane-l" x="958" y="30" text-anchor="end">online · per token, at inference</text>
+          <rect class="dg-lane" x="8" y="196" width="700" height="166" rx="14"/>
+          <text class="dg-lane-l" x="24" y="218">offline · once, before deployment</text>
+
+          <!-- online path -->
+          <text class="dg-v" x="24" y="110">x<tspan baseline-shift="sub" font-size="11">t</tspan></text>
+          <path class="dg-io" d="M46 105H92" marker-end="url(#ah)"/>
+          <rect class="dg-box fp" x="96" y="80" width="112" height="50"/><text class="dg-t" x="152" y="99">center</text><text class="dg-s" x="152" y="118">− x̄<tspan baseline-shift="sub" font-size="9">t</tspan>·1</text>
+          <path class="dg-w" d="M208 105H262" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="266" y="80" width="140" height="50"/><text class="dg-t" x="336" y="99">pad · rotate H</text><text class="dg-s" x="336" y="118">H<tspan baseline-shift="sub" font-size="9">m</tspan> ⊗ H<tspan baseline-shift="sub" font-size="9">2ᵏ</tspan></text>
+          <path class="dg-w" d="M406 105H460" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="464" y="80" width="150" height="50"/><text class="dg-t" x="539" y="99">quantize · INT4</text><text class="dg-s" x="539" y="118">closed-form, per token</text>
+          <path class="dg-w" d="M614 105H668" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="672" y="80" width="110" height="50"/><text class="dg-t" x="727" y="99">INT4 GEMM</text><text class="dg-s" x="727" y="118">Ŵ<tspan baseline-shift="sub" font-size="9">R</tspan> · Q(·)</text>
+          <path class="dg-w" d="M782 105H812" marker-end="url(#ah)"/>
+          <rect class="dg-box io" x="816" y="80" width="112" height="50"/><text class="dg-t" x="872" y="99">epilogue</text><text class="dg-s" x="872" y="118">+ x̄<tspan baseline-shift="sub" font-size="9">t</tspan>w₁ + b</text>
+          <path class="dg-io" d="M928 105H946" marker-end="url(#ah)"/>
+          <text class="dg-v" x="950" y="110">y<tspan baseline-shift="sub" font-size="11">t</tspan></text>
+
+          <!-- mean bypass -->
+          <path id="pMean" class="dg-fp" d="M152 80V50H872V76" marker-end="url(#ah)"/>
+          <text class="dg-s" x="512" y="42" style="fill:var(--accent);font-weight:600">x̄<tspan baseline-shift="sub" font-size="9">t</tspan> · full precision, bypasses both quantizers</text>
+
+          <!-- offline path -->
+          <text class="dg-v" x="24" y="282">W</text>
+          <path class="dg-io" d="M44 277H92" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="96" y="252" width="160" height="50"/><text class="dg-t" x="176" y="271">ℓ<tspan baseline-shift="sub" font-size="9">p</tspan> solver (RoDS)</text><text class="dg-s" x="176" y="290">p = 0.7 · groups of 64</text>
+          <path class="dg-w" d="M256 277H330" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="334" y="252" width="170" height="50"/><text class="dg-t" x="419" y="271">Ŵ<tspan baseline-shift="sub" font-size="9">R</tspan> ≈ W Pᵀ Hᵀ</text><text class="dg-s" x="419" y="290">INT4, packed</text>
+          <path id="pW" class="dg-w" d="M504 277H727V134" marker-end="url(#ah)"/>
+          <path class="dg-io" d="M60 277V334H92" marker-end="url(#ah)"/>
+          <rect class="dg-box fp" x="96" y="316" width="130" height="36"/><text class="dg-t" x="161" y="334">w₁ = W·1</text>
+          <path id="pW1" class="dg-fp" d="M226 334H900V134" marker-end="url(#ah)"/>
+
+          <!-- moving pulses along the paths -->
+          <circle class="dg-pulse" r="4"><animateMotion dur="3.2s" repeatCount="indefinite" path="M46 105H946"/></circle>
+          <circle class="dg-pulse fp" r="4"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#pMean"/></animateMotion></circle>
+          <circle class="dg-pulse" r="3.5"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#pW"/></animateMotion></circle>
+          <circle class="dg-pulse fp" r="3.5"><animateMotion dur="4.6s" repeatCount="indefinite"><mpath href="#pW1"/></animateMotion></circle>
+        </svg>
+        <div class="dg-legend"><span><i style="border-color:var(--int4)"></i>INT4 path</span><span><i style="border-color:var(--accent);border-top-style:dashed"></i>full precision (rank-1 branch)</span><span><i style="border-color:var(--ink-2)"></i>input / output</span></div>
+      </div>
+      <figcaption class="caption">One quantized linear layer. Weights are fitted offline under a robust $\ell_p$ objective ($p=0.7$) that tracks the dense mode of each group instead of its heavy tail. Nothing in either path sees data.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ================= RESULTS ================= -->
+<section id="results">
+  <div class="wrap">
+    <div class="narrow center reveal">
+      <div class="eyebrow">Results</div>
+      <h2>Matches calibrated SVDQuant at W4A4</h2>
+      <p class="lead">MJHQ, 1024². PSNR and LPIPS compare each quantized image with the 16-bit image from the same seed.</p>
+    </div>
+
+    <div class="center reveal" style="margin-top:28px">
+      <div class="tabs" role="tablist" aria-label="Results model">
+        <button class="tab" data-res="flux" aria-selected="true">FLUX.1-schnell</button>
+        <button class="tab" data-res="sana" aria-selected="false">SANA-1.6B</button>
+        <button class="tab" data-res="pixart" aria-selected="false">PixArt-Σ</button>
+      </div>
+    </div>
+    <div class="tbl-wrap reveal">
+      <table>
+        <thead><tr><th>Method</th><th>FID ↓</th><th>ImageReward ↑</th><th>PSNR ↑</th><th>LPIPS ↓</th></tr></thead>
+        <tbody id="resBody"></tbody>
+      </table>
+    </div>
+    <p class="caption">† SVDQuant numbers reported by its authors. Regenerated under our exact protocol, calibrated SVDQuant and CentriQ also match on FLUX.1-schnell (FID 18.73 vs 18.80), and CentriQ is ahead on PixArt-Σ (19.10 vs 19.27).</p>
+
+    <div class="two" style="margin-top:72px;align-items:start">
+      <div class="reveal">
+        <h3 style="font-size:24px;font-family:'Instrument Serif',serif;font-weight:400">Fast, in the same engine</h3>
+        <p class="muted" style="margin-top:4px">FLUX.1-schnell transformer, seconds per image (1024², 4 steps, batch 1). Both 4-bit methods run in the same fused Nunchaku engine on the same layers.</p>
+        <div class="tabs" role="tablist" aria-label="GPU" style="margin-top:8px">
+          <button class="tab" data-gpu="pro" aria-selected="true">RTX PRO 6000</button>
+          <button class="tab" data-gpu="a100" aria-selected="false">A100</button>
+        </div>
+        <div class="bars" id="latBars"></div>
+      </div>
+      <div class="reveal">
+        <h3 style="font-size:24px;font-family:'Instrument Serif',serif;font-weight:400">Cheap to deploy</h3>
+        <p class="muted" style="margin-top:4px">A new checkpoint converts in minutes, with no data, and the global settings transfer unchanged.</p>
+        <div class="kpis" style="grid-template-columns:1fr 1fr">
+          <div class="kpi"><b>9.3 min</b><span>FLUX.1-schnell conversion on one A100 (13.0 h for SVDQuant)</span></div>
+          <div class="kpi"><b>3.1 min</b><span>PixArt-Σ conversion (SANA-1.6B: 3.3 min)</span></div>
+          <div class="kpi"><b>26.8 GB</b><span>peak memory, vs 26.6 GB SVDQuant and 36.3 GB BF16</span></div>
+          <div class="kpi"><b>77.59</b><span>FID on unseen FLUX.1-dev, settings frozen (SVDQuant calibrated for it: 77.66)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LOW BIT ================= -->
+<section class="alt" id="lowbit">
+  <div class="wrap">
+    <div class="narrow center reveal">
+      <div class="eyebrow">Below 4 bits</div>
+      <h2>Usable images at 2-bit activations</h2>
+      <p class="lead">On FLUX.1-schnell, CentriQ is the first calibration-free method to keep image quality at W4A2, and it holds at W2A4 where SVDQuant degrades to texture.</p>
+    </div>
+    <figure class="reveal" style="margin-top:36px">
+      <div class="figimg"><img src="assets/img/fig_geneval.png" alt="GenEval prompts on FLUX.1-schnell at W4A4, W4A2 and W2A4 for SVDQuant and CentriQ. SVDQuant collapses at W4A2 and W2A4; CentriQ keeps the objects." loading="lazy"></div>
+      <figcaption class="caption">GenEval prompts on FLUX.1-schnell. Marks give the verdict of the GenEval detector. 2-bit settings use simulated quantization, since no fused kernel yet supports 2-bit activations.</figcaption>
+    </figure>
+
+    <div class="chart-card reveal" style="margin-top:44px">
+      <div class="chart-head">
+        <div><h3>What each component buys, FLUX.1-schnell, MJHQ FID (log scale)</h3>
+        <p>Each step adds one component. Dashed line: BF16 (19.45). Hover a point for its value.</p></div>
+        <button class="linkbtn" id="ablToggle" aria-expanded="false" aria-controls="ablTable">Show table</button>
+      </div>
+      <div class="multiples" id="ablChart" role="img" aria-label="FID after each added component at W4A4, W4A2 and W2A4"></div>
+    </div>
+    <div class="tbl-wrap reveal" id="ablTable" hidden style="margin-top:14px">
+      <table>
+        <thead><tr><th>FLUX.1-schnell, MJHQ FID ↓</th><th>W4A4</th><th>W4A2</th><th>W2A4</th></tr></thead>
+        <tbody>
+          <tr><td>No transform</td><td>40.62</td><td class="bad">437.41</td><td class="bad">363.14</td></tr>
+          <tr><td>+ rotation (QuaRot-style)</td><td>25.65</td><td class="bad">455.30</td><td>35.84</td></tr>
+          <tr><td>+ centering, exact rank-1 re-injection</td><td>18.46</td><td class="bad">444.21</td><td>21.81</td></tr>
+          <tr class="ours"><td>+ percentile clip = CentriQ</td><td>18.80</td><td>35.59</td><td>21.56</td></tr>
+          <tr class="ref"><td>BF16</td><td>19.45</td><td>19.45</td><td>19.45</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">Component ablation. Centering is what closes the gap at 4 bits; one shared clip percentile then carries it to 2-bit activations.</p>
+  </div>
+</section>
+
+<!-- ================= BIBTEX ================= -->
+<section id="bibtex">
+  <div class="wrap narrow">
+    <div class="eyebrow">Citation</div>
+    <h2>BibTeX</h2>
+<pre class="bib"><button class="copy" id="copyBib">Copy</button><code id="bibText">@misc{jovanović2026centriqcalibrationfreequantizationdiffusion,
+      title={CentriQ: Calibration-Free Quantization of Diffusion Transformers via Exact Mean Centering},
+      author={Nataša Jovanović and Mathieu Salzmann and Saqib Javed},
+      year={2026},
+      eprint={2610.06260},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2610.06260},
+}</code></pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">CentriQ · Nataša Jovanović, Mathieu Salzmann, Saqib Javed · Tenstorrent &amp; EPFL</div>
+</footer>
+
+<script>
+/* ---------------- data ---------------- */
+const NAMES = {svd:"SVDQuant", convrot:"ConvRot-style", hadanorm:"HadaNorm-style", rot:"Rotation only"};
+const NOTE  = {centriq:"no data", svd:"calibrated", convrot:"no data", hadanorm:"no data", rot:"no data"};
+const cmp2 = m => (i,k) => `assets/img/cmp2/${m}_${i}_${k}.jpg`;
+const SETS = {
+  pixart: {ref:"FP16", methods:["convrot","hadanorm","rot"], items:[377,4,998,853,658,206], src:cmp2("pixart")},
+  flux:   {ref:"BF16", methods:["svd","convrot","hadanorm","rot"], items:[169,848,814,124,916,384], src:cmp2("flux")},
+  sana:   {ref:"BF16", methods:["svd"], items:[0,1,2,3],
+           src:(r,k)=>`assets/img/cmp/sana_r${r}_c${{ref:0,centriq:1,svd:2}[k]}.jpg`}
+};
+let model="pixart", row=SETS.pixart.items[0], left=SETS.pixart.methods[0];
+
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const label = k => k==="ref" ? SETS[model].ref : NAMES[k];
+function renderCompare(){
+  const s=SETS[model], opts=["ref",...s.methods];
+  if(!opts.includes(left)) left=s.methods[0];
+  $("#leftTabs").innerHTML = opts.map(k=>`<button class="tab" data-left="${k}" aria-selected="${k===left}">${k==="ref"?"16-bit":NAMES[k]}</button>`).join("");
+  $$("#leftTabs .tab").forEach(b=>b.onclick=()=>{left=b.dataset.left;renderCompare();});
+  $("#imgL").src = s.src(row,left); $("#imgL").alt = label(left)+" sample";
+  $("#imgR").src = s.src(row,"centriq"); $("#imgR").alt="CentriQ W4A4 sample";
+  $("#lblL").textContent = left==="ref" ? s.ref : label(left)+" W4A4";
+  $("#thumbs").innerHTML = s.items.map((r,n)=>`<button class="thumb" aria-pressed="${r===row}" data-row="${r}" aria-label="Prompt ${n+1}"><img src="${s.src(r,"centriq")}" alt="" loading="lazy"></button>`).join("");
+  $$("#thumbs .thumb").forEach(b=>b.onclick=()=>{row=+b.dataset.row;renderCompare();});
+  const strip=["ref","centriq",...s.methods];
+  $("#triple").style.gridTemplateColumns=`repeat(${strip.length},1fr)`;
+  $("#triple").innerHTML = strip.map(k=>{
+    const l = k==="ref" ? s.ref : k==="centriq" ? "<b>CentriQ</b>" : NAMES[k];
+    return `<figure><img src="${s.src(row,k)}" alt="${k==="centriq"?"CentriQ":label(k)}" loading="lazy"><figcaption>${l}${NOTE[k]?`<br><span style="font-size:11px">${NOTE[k]}</span>`:""}</figcaption></figure>`;}).join("");
+}
+$$("[data-model]").forEach(b=>b.onclick=()=>{model=b.dataset.model;row=SETS[model].items[0];left=SETS[model].methods[0];$$("[data-model]").forEach(x=>x.setAttribute("aria-selected",x===b));renderCompare();});
+renderCompare();
+
+/* slider drag */
+(()=>{const el=$("#slider");let drag=false;
+  const set=e=>{const r=el.getBoundingClientRect();const x=Math.min(Math.max((e.clientX-r.left)/r.width,0),1);el.style.setProperty("--pos",(x*100)+"%");};
+  el.addEventListener("pointerdown",e=>{drag=true;el.setPointerCapture(e.pointerId);set(e);});
+  el.addEventListener("pointermove",e=>{if(drag)set(e);});
+  el.addEventListener("pointerup",()=>drag=false);
+  el.tabIndex=0; el.setAttribute("role","slider"); el.setAttribute("aria-label","Comparison position");
+  el.addEventListener("keydown",e=>{const cur=parseFloat(el.style.getPropertyValue("--pos"))||50;
+    if(e.key==="ArrowLeft")el.style.setProperty("--pos",Math.max(0,cur-5)+"%");
+    if(e.key==="ArrowRight")el.style.setProperty("--pos",Math.min(100,cur+5)+"%");});
+})();
+
+/* results table (Table 1, MJHQ) */
+const RES = {
+  flux:[["BF16","19.5","0.966","–","–","ref"],["RTN","43.9","−0.148","11.04","0.567","",0],["HQQ","40.9","−0.084","11.29","0.558","",0],["SVDQuant†","18.3","0.951","18.3","0.258","",1],["CentriQ","18.8","0.939","18.40","0.173","ours",0]],
+  sana:[["BF16","16.0","1.097","–","–","ref"],["RTN","33.3","−0.330","12.02","0.497","",0],["HQQ","33.2","−0.484","11.85","0.505","",0],["SVDQuant†","19.3","0.935","17.8","0.220","",1],["CentriQ","16.2","1.072","17.64","0.172","ours",0]],
+  pixart:[["FP16","16.7","0.952","–","–","ref"],["RTN","481.5","−2.273","6.14","0.995","",0],["HQQ","462.6","−2.273","6.37","0.991","",0],["SVDQuant†","19.2","0.878","17.6","0.323","",1],["CentriQ","19.1","0.891","16.15","0.278","ours",0]]
+};
+function renderRes(m){
+  $("#resBody").innerHTML = RES[m].map(([n,a,b,c,d,cls,cal])=>{
+    const tag = cls==="ref" ? "" : (cal ? '<span class="pill y">calibrated</span>' : '<span class="pill n">no data</span>');
+    return `<tr class="${cls}"><td>${n}${tag}</td><td>${a}</td><td>${b}</td><td>${c}</td><td>${d}</td></tr>`;}).join("");
+}
+$$("[data-res]").forEach(b=>b.onclick=()=>{$$("[data-res]").forEach(x=>x.setAttribute("aria-selected",x===b));renderRes(b.dataset.res);});
+renderRes("flux");
+
+/* latency (Table 4, transformer only) */
+const LAT = {
+  pro:[["BF16","1.166",""],["BF16 + compile","1.006",""],["SVDQuant","0.646","svd"],["CentriQ","0.664","ours"]],
+  a100:[["BF16","1.762",""],["BF16 + compile","1.407",""],["SVDQuant","1.245","svd"],["CentriQ","1.289","ours"]]
+};
+function renderLat(g){
+  const max=Math.max(...LAT[g].map(r=>+r[1]));
+  $("#latBars").innerHTML = LAT[g].map(([n,v,c])=>`<div class="bar-row"><span>${n}</span><div class="bar-track"><div class="bar ${c}" style="width:0"></div></div><span class="v">${v} s</span></div>`).join("");
+  requestAnimationFrame(()=>$$("#latBars .bar").forEach((b,i)=>b.style.width=(LAT[g][i][1]/max*100)+"%"));
+}
+$$("[data-gpu]").forEach(b=>b.onclick=()=>{$$("[data-gpu]").forEach(x=>x.setAttribute("aria-selected",x===b));renderLat(b.dataset.gpu);});
+renderLat("pro");
+
+/* ---------------- toy token demo ---------------- */
+const N=48;
+function rng(seed){return()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646;};}
+const R=rng(7);
+const gauss=()=>{let u=0,v=0;while(!u)u=R();while(!v)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+const bulk=Array.from({length:N},()=>Math.abs(gauss())*0.35).sort((a,b)=>b-a);
+const MODES={
+  raw:bulk.map((v,i)=>v*(1+1.6*Math.exp(-i/7))+0.25*Math.exp(-i/3)),
+  rot:[bulk[0]*2.4,...bulk.slice(1)],   // spike set so the grid gain matches the measured 2.4x
+  cen:bulk
+};
+let mode="rot";
+function drawToken(){
+  const c=$("#token"), dpr=devicePixelRatio||1, w=c.clientWidth, h=c.clientHeight;
+  c.width=w*dpr; c.height=h*dpr; const x=c.getContext("2d"); x.scale(dpr,dpr);
+  const css=getComputedStyle(document.documentElement);
+  const col = mode==="cen" ? css.getPropertyValue("--accent").trim() : mode==="rot" ? css.getPropertyValue("--int4").trim() : css.getPropertyValue("--muted").trim();
+  const vals=MODES[mode], top=Math.max(...MODES.rot,...MODES.raw)*1.08, bw=w/N;
+  vals.forEach((v,i)=>{const bh=v/top*(h-8); x.fillStyle=col; x.globalAlpha=(mode==="rot"&&i===0)?1:.85; x.fillRect(i*bw+1,h-bh,bw-2,bh);});
+  x.globalAlpha=1;
+  const mx=Math.max(...vals), step=mx/7;
+  x.strokeStyle=css.getPropertyValue("--ink-2").trim(); x.globalAlpha=.35; x.setLineDash([4,4]);
+  for(let k=1;k<=7;k++){const y=h-step*k/top*(h-8); x.beginPath(); x.moveTo(0,y); x.lineTo(w,y); x.stroke();}
+  x.setLineDash([]); x.globalAlpha=1;
+  if(mode==="rot"){x.fillStyle=col;x.font="600 12px Inter";x.fillText("← DC coordinate sets the range",bw+8,h-vals[0]/top*(h-8)+12);}
+  $("#rMax").textContent=mx.toFixed(2);
+  $("#rStep").textContent=step.toFixed(3);
+  const g=(Math.max(...MODES.rot)/7)/step; $("#rGain").textContent= g.toFixed(1)+"×";
+}
+$$("[data-mode]").forEach(b=>b.onclick=()=>{mode=b.dataset.mode;$$("[data-mode]").forEach(x=>x.setAttribute("aria-pressed",x===b));drawToken();});
+addEventListener("resize",drawToken); drawToken();
+
+/* ---------------- hero bars animation ---------------- */
+(()=>{const c=$("#bars"), x=c.getContext("2d"); const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const M=96, base=Array.from({length:M},()=>0.25+Math.abs(gauss())*0.22);
+  let t=0;
+  function frame(){
+    const dpr=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight; if(c.width!==w*dpr){c.width=w*dpr;c.height=h*dpr;}
+    x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,w,h);
+    const phase=(Math.sin(t/140)+1)/2;            // 0 = spike present, 1 = centered
+    const spike=1-phase, bw=w/M;
+    for(let i=0;i<M;i++){
+      let v=base[i]*(0.85+0.15*Math.sin(t/40+i*.7));
+      const isDC=i===Math.floor(M/2);
+      if(isDC) v=v+spike*1.9;
+      const bh=Math.min(v/2.3,1)*h;
+      const g=x.createLinearGradient(0,h-bh,0,h);
+      if(isDC&&spike>.15){g.addColorStop(0,`rgba(242,131,74,${.35+.6*spike})`);g.addColorStop(1,"rgba(242,131,74,0)");}
+      else{g.addColorStop(0,"rgba(120,200,192,.55)");g.addColorStop(1,"rgba(120,200,192,0)");}
+      x.fillStyle=g; x.fillRect(i*bw+1,h-bh,bw-2,bh);
+    }
+    t++; if(!reduce) requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+/* reveal on scroll */
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target);}}),{threshold:.12});
+$$(".reveal").forEach(el=>io.observe(el));
+
+/* copy bibtex */
+$("#copyBib").onclick=async()=>{try{await navigator.clipboard.writeText($("#bibText").textContent);$("#copyBib").textContent="Copied";setTimeout(()=>$("#copyBib").textContent="Copy",1500);}catch(e){}};
+
+/* math */
+addEventListener("load",()=>{ if(window.renderMathInElement) renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],trust:true,strict:false}); });
+
+/* ---------------- v2 charts ---------------- */
+(function(){
+  const NS="http://www.w3.org/2000/svg";
+  const el=(t,a={},txt)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;};
+  const tip=document.createElement("div");tip.className="tip";tip.setAttribute("role","tooltip");document.body.appendChild(tip);
+  function showTip(evt,val,label){tip.replaceChildren();const b=document.createElement("b");b.textContent=val;const s=document.createElement("span");s.textContent=label;tip.append(b,s);
+    const r=(evt.currentTarget||evt.target).getBoundingClientRect();const x=evt.clientX||r.left+r.width/2,y=evt.clientY||r.top;
+    tip.style.left=Math.min(innerWidth-250,x+12)+"px";tip.style.top=(y-48)+"px";tip.style.opacity=1;}
+  const hideTip=()=>tip.style.opacity=0;
+  const logx=(v,lo,hi,a,b)=>a+(Math.log10(v)-Math.log10(lo))/(Math.log10(hi)-Math.log10(lo))*(b-a);
+  const fmt=v=>v>=100?v.toFixed(0):v.toFixed(1);
+
+  /* Chart A: W4A4 FID dot plot, one panel per model */
+  const FID={"PixArt-Σ":{ref:["FP16",16.7],rows:[["RTN",481.5,"g"],["NF4",479.6,"g"],["HQQ",462.6,"g"],["SVDQuant",19.2,"s"],["CentriQ",19.1,"c"]]},
+             "FLUX.1-schnell":{ref:["BF16",19.5],rows:[["RTN",43.9,"g"],["NF4",41.3,"g"],["HQQ",40.9,"g"],["SVDQuant",18.3,"s"],["CentriQ",18.8,"c"]]},
+             "SANA-1.6B":{ref:["BF16",16.0],rows:[["RTN",33.3,"g"],["NF4",33.3,"g"],["HQQ",33.2,"g"],["SVDQuant",19.3,"s"],["CentriQ",16.2,"c"]]}};
+  const COL={g:"var(--gray-mark)",s:"var(--int4)",c:"var(--accent)"};
+  const NOTE={g:"no calibration data",s:"calibrated",c:"no calibration data"};
+  const fc=document.getElementById("fidChart");
+  if(fc) for(const [model,d] of Object.entries(FID)){
+    const W=320,H=196,L=74,R=304,T=34,rowH=28,lo=10,hi=1000;
+    const svg=el("svg",{viewBox:`0 0 ${W} ${H}`});
+    svg.append(el("text",{x:0,y:14,class:"panel-t"},model));
+    for(const t of [10,30,100,300,1000]){const x=logx(t,lo,hi,L,R);svg.append(el("line",{x1:x,x2:x,y1:T-6,y2:T+rowH*5-8,class:"gridl"}));svg.append(el("text",{x,y:T+rowH*5+8,class:"ax","text-anchor":"middle"},t));}
+    const rx=logx(d.ref[1],lo,hi,L,R);
+    svg.append(el("line",{x1:rx,x2:rx,y1:T-12,y2:T+rowH*5-8,class:"refl"}));
+    svg.append(el("text",{x:rx+4,y:T-14,class:"ax"},`${d.ref[0]} ${d.ref[1]}`));
+    d.rows.forEach(([name,v,k],i)=>{
+      const y=T+i*rowH+6, x=logx(v,lo,hi,L,R), g=el("g",{class:"row"});
+      g.append(el("text",{x:L-10,y:y+4,class:"lbl","text-anchor":"end","font-weight":k==="c"?"700":"400"},name));
+      g.append(el("line",{x1:L,x2:x,y1:y,y2:y,stroke:COL[k],"stroke-width":2,"stroke-linecap":"round",opacity:.35}));
+      g.append(el("circle",{cx:x,cy:y,r:5,fill:COL[k],stroke:"var(--card)","stroke-width":2,class:"mk"}));
+      const right=x>R-34; g.append(el("text",{x:right?x-10:x+10,y:y+4,class:"val","text-anchor":right?"end":"start"},fmt(v)));
+      const hit=el("rect",{x:0,y:y-rowH/2,width:W,height:rowH,class:"hit",tabindex:0});
+      hit.addEventListener("pointermove",e=>showTip(e,fmt(v),`${name} · ${model} · ${NOTE[k]}`));hit.addEventListener("focus",e=>showTip(e,fmt(v),`${name} · ${model} · ${NOTE[k]}`));
+      hit.addEventListener("pointerleave",hideTip);hit.addEventListener("blur",hideTip);
+      g.append(hit); svg.append(g);
+    });
+    fc.append(svg);
+  }
+
+  /* Chart B: ablation small multiples */
+  const STEPS=["None","+ rotation","+ centering","+ clip"];
+  const ABL={"W4A4":[40.62,25.65,18.46,18.80],"W4A2":[437.41,455.30,444.21,35.59],"W2A4":[363.14,35.84,21.81,21.56]};
+  const ac=document.getElementById("ablChart");
+  if(ac) for(const [bits,vals] of Object.entries(ABL)){
+    const W=320,H=230,L=40,R=300,T=30,B=186,lo=10,hi=1000;
+    const y=v=>B-(Math.log10(v)-1)/(Math.log10(hi)-1)*(B-T);
+    const x=i=>L+12+i*((R-L-24)/3);
+    const svg=el("svg",{viewBox:`0 0 ${W} ${H}`});
+    svg.append(el("text",{x:0,y:14,class:"panel-t"},bits));
+    for(const t of [10,30,100,300,1000]){svg.append(el("line",{x1:L,x2:R,y1:y(t),y2:y(t),class:"gridl"}));svg.append(el("text",{x:L-6,y:y(t)+4,class:"ax","text-anchor":"end"},t));}
+    svg.append(el("line",{x1:L,x2:R,y1:y(19.45),y2:y(19.45),class:"refl"}));
+    svg.append(el("path",{d:vals.map((v,i)=>`${i?"L":"M"}${x(i)} ${y(v)}`).join(""),fill:"none",stroke:"var(--ink-2)","stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"}));
+    vals.forEach((v,i)=>{
+      const last=i===3, g=el("g",{class:"row"});
+      g.append(el("circle",{cx:x(i),cy:y(v),r:last?6:4.5,fill:last?"var(--accent)":"var(--ink-2)",stroke:"var(--card)","stroke-width":2,class:"mk"}));
+      if(i===0||last) g.append(el("text",{x:x(i)+(last?-10:10),y:y(v)-10,class:"val","text-anchor":last?"end":"start","font-weight":last?"700":"400"},fmt(v)));
+      g.append(el("text",{x:x(i),y:B+18,class:"ax","text-anchor":"middle"},STEPS[i]));
+      const hit=el("rect",{x:x(i)-30,y:T-10,width:60,height:B-T+20,class:"hit",tabindex:0});
+      const lab=`${bits} · ${STEPS[i]}${last?" = CentriQ":""} · BF16 19.45`;
+      hit.addEventListener("pointermove",e=>showTip(e,v.toFixed(2),lab));hit.addEventListener("focus",e=>showTip(e,v.toFixed(2),lab));
+      hit.addEventListener("pointerleave",hideTip);hit.addEventListener("blur",hideTip);
+      g.append(hit); svg.append(g);
+    });
+    svg.append(el("text",{x:R,y:B+38,class:"ax","text-anchor":"end"},"orange = full CentriQ"));
+    ac.append(svg);
+  }
+  const tg=document.getElementById("ablToggle"), tb=document.getElementById("ablTable");
+  if(tg&&tb) tg.onclick=()=>{const open=tb.hidden; tb.hidden=!open; tg.setAttribute("aria-expanded",open); tg.textContent=open?"Hide table":"Show table"; if(open) tb.classList.add("in");};
+})();
+</script>
+</body>
+</html>
