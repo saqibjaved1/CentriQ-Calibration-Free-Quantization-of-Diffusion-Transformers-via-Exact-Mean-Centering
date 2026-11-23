@@ -1,0 +1,15 @@
+# FLUX.1-schnell defaults.
+
+name: flux
+model_id: black-forest-labs/FLUX.1-schnell
+default_dtype: bfloat16
+default_steps: 4
+default_guidance_scale: 0.0
+height: 512
+width: 512
+seed: 42
+
+# Default: only proj_out is kept in full precision. Add more layer leaf
+# names here (or override via the per-script YAML config) to skip them.
+ignore_layers:
+  - proj_out

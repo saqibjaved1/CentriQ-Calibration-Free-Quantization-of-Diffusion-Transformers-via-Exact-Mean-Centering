@@ -1,0 +1,5 @@
+# PSNR pairwise metric on a pre-generated dir.
+
+name: psnr
+num_samples: 5000
+reference_method: fp16

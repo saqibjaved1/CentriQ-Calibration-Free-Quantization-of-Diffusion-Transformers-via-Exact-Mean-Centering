@@ -1,0 +1,18 @@
+# SANA 1.6B 1024px defaults. These mirror what utils/model_config.get_model_config()
+# returns at runtime; Hydra is the single source of truth going forward.
+
+name: sana
+model_id: Efficient-Large-Model/Sana_1600M_1024px_BF16_diffusers
+default_dtype: bfloat16
+default_steps: 20
+default_guidance_scale: 4.5
+height: 1024
+width: 1024
+max_sequence_length: 300
+
+# Default: only proj_out is kept in full precision. Add more layer leaf
+# names here (or override via the per-script YAML config) to skip them.
+# NOTE: SANA's FFN (GLUMBConv) uses Conv2d, not nn.Linear, so it is left
+# in full precision automatically by sinq_diffusion's nn.Linear filter.
+ignore_layers:
+  - proj_out

@@ -1,0 +1,64 @@
+# RoDS-A composed W4A4 -- RECIPE (i) in the PAD deployment basis (V-task fork,
+# option 1: headline 19.13 = shipped config (2026-06-12).
+#
+# Identical to the kron deployment arm (rods_a_w4a4_kron.yaml) EXCEPT:
+#   rotation: pad           (zero-pad to pow2 + FWHT; K 1152->2048, 4608->8192)
+#   percentile_p: 0.9995    (the AB3.2 PAD-ONLY clip lock; kron stays 0.999)
+# The int4 deployment LOADS the pinned pad W4 fits artifact -- produced at the
+# HEADLINE install lineage and verified cross-run bit-identical (V2.1):
+#   fits_path:    outputs/rods_a_pad_fits/pad_w4_fits.pt
+#   expected_sha: 9ca25bbc6f87905dd487ee8154a9e1dadaf97d4250e9755d8955ad4f77dfe597
+# Parity acceptance is the PER-K gate (contract S11): <=1.5e-3 for K<=4608,
+# <=1.6e-3 for K=8192 (kernel fp16-fpsum floor, fp32main==0 on record) -- live
+# parity runs set gate_overrides: {8192: 0.0016}.
+name: rods_a_w4a4_pad
+method: rods_a_w4a4
+
+# --- recipe (i) skip set: the 56 cross-attn K/V weights stay FP16 ---
+ignore_tags:
+  - attn2.to_k
+  - attn2.to_v
+
+# --- activation (A4) --- (locked estimator; clip lock is PAD-ONLY 0.9995, AB3.2)
+act_bits: 4
+scale_estimator: percentile
+clip_family: gaussian
+huber_c: 1.345
+percentile_p: 0.9995
+rotate_act: true
+rotation: pad                 # deployment basis: zero-pad pow2 (K-inflating; the
+                              # effective activation rate is 7.11 bits/real-dim --
+                              # disclosed via the V4 effective-rate column)
+
+# --- weight (W4) ---
+nbits: 4
+group_size: 64
+# fit_t forced False inside prepare_weight (t absorbed into per-(out,group) s).
+
+# --- per-token mean-centering (Contract v3) ---
+center_act_mean: true
+center_roles_enabled: {}
+
+# --- per-role precision ablation (all true = uniform W4A4 over the recipe-(i) set) ---
+roles_enabled:
+  self_attn_qkv: true
+  self_attn_proj: true
+  cross_attn_q: true
+  cross_attn_proj: true
+  fc1: true
+  fc2: true
+
+# --- kernel-semantics selector ---
+semantics: reference
+
+# --- int4 activation packing path (Step 4) ---
+act_path: reference           # deployed runs override to `fast` (opt-A, bit-identical)
+
+# --- analysis instrumentation (opt-B/B1) ---
+instrument: false
+
+# --- whole-layer CUDA graphs (opt-B/B3) ---
+graphs: false
+
+# --- host epilogue realization (opt-C) ---
+epilogue: reference           # deployed runs override to `fused` (I2-envelope gated)

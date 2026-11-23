@@ -1,0 +1,45 @@
+# RoDS-A composed W4A4 (Phase 2, fake-quant). Activations: per-token rotated
+# percentile clip. Weights: grouped RoDS re-fit on W̃ with t absorbed (fit_t=False).
+name: rods_a_w4a4
+method: rods_a_w4a4
+
+# --- activation (A4) ---
+act_bits: 4                  # q_max = 2^{b-1} - 1
+scale_estimator: percentile  # LOCKED estimator (percentile, p=0.999, gamma*-scaled)
+clip_family: gaussian        # gamma* table
+huber_c: 1.345               # only used by the huber ablation estimator
+percentile_p: 0.999
+rotate_act: true             # rotation isolator: toggle off => weights also un-rotated
+rotation: pad                # pad (zero-pad to pow2; legacy) | kronecker (deployment K = Cin)
+instrument: false            # opt-B/B1: §6 analysis floats OFF (host syncs); does not affect codes
+
+# --- weight (W4) ---
+nbits: 4                     # weight bit-width
+group_size: 64               # input-axis grouping (folds into grouped-INT4 epilogue)
+fit_t: false                 # default: t absorbed into per-(out,group) s (W4A4-realizable).
+                             # A12 free-t arm sets quant.fit_t=true (FAKEQUANT only).
+
+# --- per-token mean-centering (DC-blowup fix) ---
+# Contract v3: DELIBERATELY kept OFF. This is the bit-identical regression baseline
+# protected by tests/test_rods_a_w4a4.py::test_center_off_is_regression. Deployment
+# uses the centered configs (rods_a_w4a4_recipe / rods_a_w4a4_kron). Do NOT flip this.
+center_act_mean: false       # OFF => bit-identical to the pre-centering path
+# Per-role override, consulted ONLY when center_act_mean: true. Unlisted roles
+# default to true, so {} == center every quantized role.
+center_roles_enabled: {}
+
+# --- per-role precision ablation (all true = uniform W4A4) ---
+roles_enabled:
+  self_attn_qkv: true
+  self_attn_proj: true
+  cross_attn_q: true
+  cross_attn_proj: true
+  fc1: true
+  fc2: true
+
+# --- host epilogue realization (opt-C, INT4_GEMM_CONTRACT.md S8) ---
+# Kept "reference" here for the same reason center_act_mean stays false: this is the
+# regression baseline. "fused" (deployment lever) folds the centering rank-1 into the
+# side-GEMM; it is NOT bit-identical to reference (fp32 sum reordered) and is gated
+# against the ORACLE at the I2 envelope, not vs this path. Do NOT flip this here.
+epilogue: reference

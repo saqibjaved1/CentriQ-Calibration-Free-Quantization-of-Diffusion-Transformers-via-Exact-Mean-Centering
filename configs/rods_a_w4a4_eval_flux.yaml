@@ -1,0 +1,63 @@
+# FLUX.1-schnell composed W4A4 generation + eval (scripts/rods_a_w4a4_eval.py).
+# Mirrors rods_a_w4a4_eval_sana.yaml; the recipe (quant: rods_a_w4a4) is UNCHANGED.
+# FLUX-specific: skip set re-derived inside select_act_targets(model_type="flux")
+# (FL0.3: = registry ignore_layers, context stream quantized), rotation stays "pad"
+# (FL0.5: 3072=12·256 / 12288=12·1024 have no vendored Hadamard; H_12 is opt-D), and
+# steps are pinned to 4 (schnell native) so nothing inherits the stale registry default=1.
+defaults:
+  - paths: local
+  - quant: rods_a_w4a4
+  - _self_
+
+model_type: flux
+model_id: null                     # null -> FLUX registry default (FLUX.1-schnell)
+device: cuda:0
+cpu_offload: false                 # W4A4 fakequant: put FLUX on the GPU (fits 80 GB) so
+                                   # weights are on `device` before install (offload would
+                                   # leave operands on mixed devices -> prepare_weight crash).
+seed: 42                        # matches SANA / deepcompressor
+
+output_dir: ${paths.outputs_root}/rods_a_w4a4_flux
+mjhq_dir: ${paths.mjhq5k}           # shared svdquant MJHQ-5k split (same as PixArt/SANA/ablation)
+ablation_tag: uniform              # namespaces output dir + wandb run
+
+num_samples: 16                    # SANITY default; FL3 full run sets 1000 (dev) / 5000 (eval)
+num_inference_steps: 4             # schnell native (NOT null -> would inherit registry=1)
+guidance_scale: 0.0                # schnell is guidance-distilled (no CFG)
+height: 1024
+width: 1024
+
+# Gating flags (sanity defaults; FL3 flips fid/ir on)
+contact_sheet: true
+# capture_sqnr with the fp32 default stores a full FP32 copy of every original weight
+# (per-layer composed real-activation SQNR). On 12B FLUX that is a second fp32
+# transformer (~48 GB) and OOMs one 80 GB card. OFF by default for FLUX; composed-SQNR
+# runs (factorization sweep) turn it on WITH capture_dtype=float16 (exact bf16 cast,
+# amax-guarded, ~13.6 GB resident) which fits alongside the fp16 W_hat cache.
+capture_sqnr: false
+capture_dtype: float32             # sweep runs override to float16 with capture_sqnr=true
+install_ffn_conv: false            # SANA-only knob; inert on FLUX (no GLUMBConv)
+compute_fid: false
+compute_ir: false
+strict_rho: false                  # collect every layer's rho (gate lives in the FL1 audit)
+
+# matmul_fp32 stores W_hat (the dequant weight cache) in FP32. On 12B FLUX that is ~2.7x the
+# bf16 weight footprint (fp32 x pad 1.33) and does not fit. OFF for FLUX: fp16 W_hat is the
+# DEPLOYMENT-REPRESENTATIVE matmul (matches the int4/fp16 kernel epilogue) and halves the
+# cache. (SANA at 1.6B could afford fp32; FLUX at 12B cannot — a memory-driven, not quality,
+# difference.)
+matmul_fp32: false
+
+overwrite: false
+quant_enabled: true                # false => 16-bit reference arm (skip install_w4a4)
+use_wandb: false
+
+compute_clip: false                # per-prompt CLIP (torchmetrics CLIPScore)
+clip_model_id: openai/clip-vit-large-patch14
+
+# --- RTN/NF4 baseline cells (naive-W4A4 table) ---
+# In-place fake-quant of the act-target weights BEFORE install; requires
+# +quant.weight_quant_enabled=false (A4-only wrapper) so weights are not
+# double-quantized. null = off (existing runs bit-identical).
+baseline_weight_method: null       # null | rtn | nf4
+baseline_weight_bits: 4            # nf4 requires 4 (fixed format; no W3 NF4)

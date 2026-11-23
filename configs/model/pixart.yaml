@@ -1,0 +1,15 @@
+# PixArt-Sigma defaults. These mirror what utils/model_config.get_model_config()
+# returns at runtime; Hydra is the single source of truth going forward.
+
+name: pixart
+model_id: PixArt-alpha/PixArt-Sigma-XL-2-1024-MS
+default_dtype: float16
+default_steps: 20
+default_guidance_scale: 7.5
+height: 1024
+width: 1024
+
+# Default: only proj_out is kept in full precision. Add more layer leaf
+# names here (or override via the per-script YAML config) to skip them.
+ignore_layers:
+  - proj_out

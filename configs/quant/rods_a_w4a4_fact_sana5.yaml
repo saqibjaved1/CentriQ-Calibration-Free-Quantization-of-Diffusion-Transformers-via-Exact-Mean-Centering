@@ -1,0 +1,56 @@
+# Factorization sweep arm: SANA padded 2240->2304=36x64 (+2.9 pct).
+# Identical to rods_a_w4a4_fact.yaml EXCEPT name + the width maps below.
+name: rods_a_w4a4_fact_sana5
+method: rods_a_w4a4
+
+# --- recipe (i) skip set: the 56 cross-attn K/V weights stay FP16 ---
+ignore_tags:
+  - attn2.to_k
+  - attn2.to_v
+
+# --- activation (A4) --- (locked estimator; uniform 0.9995 clip across every
+# sweep arm so the clip point is not a confound between factorizations; the
+# on-disk kron@0.999 arm bridges to the per-basis locks)
+act_bits: 4
+scale_estimator: percentile
+clip_family: gaussian
+huber_c: 1.345
+percentile_p: 0.9995
+rotate_act: true
+rotation: factored            # per-width H_p (x) H_q via the maps below
+rotation_factorization: {"2240": [36, 64]}
+rotation_pad_to: {"2240": 2304}
+rotation_factor_order_swap: false  # reserved for a later ordering sweep
+
+# --- weight (W4) ---
+nbits: 4
+group_size: 64
+# fit_t forced False inside prepare_weight (t absorbed into per-(out,group) s).
+
+# --- per-token mean-centering (Contract v3) ---
+center_act_mean: true
+center_roles_enabled: {}
+
+# --- per-role precision ablation (all true = uniform W4A4 over the recipe-(i) set) ---
+roles_enabled:
+  self_attn_qkv: true
+  self_attn_proj: true
+  cross_attn_q: true
+  cross_attn_proj: true
+  fc1: true
+  fc2: true
+
+# --- kernel-semantics selector ---
+semantics: reference
+
+# --- int4 activation packing path (Step 4) ---
+act_path: reference           # deployed runs override to `fast` (opt-A, bit-identical)
+
+# --- analysis instrumentation (opt-B/B1) ---
+instrument: false
+
+# --- whole-layer CUDA graphs (opt-B/B3) ---
+graphs: false
+
+# --- host epilogue realization (opt-C) ---
+epilogue: reference           # deployed runs override to `fused` (I2-envelope gated)

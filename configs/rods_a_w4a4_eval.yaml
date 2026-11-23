@@ -1,0 +1,61 @@
+# Generation + eval for the composed W4A4 path (scripts/rods_a_w4a4_eval.py).
+# MJHQ-5k (svdquant subset) FID + ImageReward, with per-layer real-activation SQNR.
+defaults:
+  - paths: local
+  - quant: rods_a_w4a4
+  - _self_
+
+model_type: pixart
+model_id: null                     # null -> model_config default (PixArt-Sigma-XL)
+device: cuda:0
+
+output_dir: ${paths.outputs_root}/rods_a_w4a4
+mjhq_dir: ${paths.mjhq5k}           # svdquant MJHQ-5k (images/ + prompts.yaml)
+ablation_tag: uniform              # namespaces output dir + wandb run
+
+num_samples: 16                    # SANITY default; FULL run sets 5000
+num_inference_steps: null          # null -> model default (20 for PixArt)
+guidance_scale: null
+height: 1024
+width: 1024
+seed: 12345                        # matches SVDQuant / deepcompressor
+
+# Gating flags (sanity defaults; the MJHQ launch script flips these on)
+contact_sheet: true
+capture_sqnr: true
+capture_dtype: float32             # SQNR reference-copy dtype: float32 (legacy,
+                                   # bit-identical) | float16 (halves resident
+                                   # fp_weight memory; amax-guarded exact bf16 cast)
+install_ffn_conv: false            # true => also quantize the SANA GLUMBConv 1x1
+                                   # pointwise convs (diagnostic runs only)
+compute_fid: false
+compute_ir: false
+strict_rho: false                  # collect every layer's rho (gate is in the dry-run)
+matmul_fp32: false                 # fp16 X̃_hat @ W̃_hatᵀ (faster, matches deploy);
+                                   # true => fp32 to isolate quant error from fp16 rounding
+overwrite: false                   # false => resume (skip valid existing images);
+                                   # true => regenerate every index from 0000
+
+use_wandb: false                   # offline by default (WANDB_MODE)
+
+# --- Phase 3 ablation (AB1) dev-slice screening (firewall) ---
+dev_slice: false                   # true => screen on the disjoint dev slice (NOT svdquant)
+dev_prompts_path: ${paths.outputs_root}/rods_a_w4a4_ablation/dev_slice/dev_prompts.json
+paired_seed: false                 # true => reseed per image from the persisted per-prompt seed
+quant_enabled: true                # false => pure FP16 baseline arm (skip install_w4a4)
+compute_clip: false                # per-prompt CLIP (torchmetrics CLIPScore)
+clip_model_id: openai/clip-vit-large-patch14
+
+# --- U1 attribution: gated int4 dev arm (pad-vs-kron task) ---
+allow_int4_backend: false          # true => permit quant.backend=int4 (kron pinned fits only;
+                                   # assert_deploy_instrument_off enforced)
+fits_path: null                    # pinned kron W4 fits .pt; optional for fakequant (arm (b):
+                                   # same audited weights as int4), REQUIRED for int4
+expected_sha: null                 # sha256 of fits_path (hard-verified by load_kron_fits)
+
+# --- RTN/NF4 baseline cells (naive-W4A4 table) ---
+# In-place fake-quant of the act-target weights BEFORE install; requires
+# +quant.weight_quant_enabled=false (A4-only wrapper) so weights are not
+# double-quantized. null = off (existing runs bit-identical).
+baseline_weight_method: null       # null | rtn | nf4
+baseline_weight_bits: 4            # nf4 requires 4 (fixed format; no W3 NF4)

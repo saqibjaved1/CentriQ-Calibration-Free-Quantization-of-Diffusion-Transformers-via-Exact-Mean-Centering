@@ -1,0 +1,6 @@
+# ImageReward score on a pre-generated dir.
+
+name: imagereward
+num_samples: 5000
+score_reference: false
+force: false

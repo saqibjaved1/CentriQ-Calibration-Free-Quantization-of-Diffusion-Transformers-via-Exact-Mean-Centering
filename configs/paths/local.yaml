@@ -1,0 +1,10 @@
+# Local paths. Override with environment variables or on the command line,
+# e.g. `paths.datasets_root=/data`.
+project_root: .
+datasets_root: ${oc.env:CENTRIQ_DATA,'./data'}
+outputs_root: ${oc.env:CENTRIQ_OUTPUTS,'./outputs'}
+hf_cache: ${oc.env:HF_HOME,'~/.cache/huggingface'}
+
+mjhq30k: ${paths.datasets_root}/mjhq30k
+mjhq5k: ${paths.datasets_root}/mjhq5k
+mjhq5k_prompts: ${paths.mjhq5k}/prompts.yaml

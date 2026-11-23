@@ -1,0 +1,54 @@
+# SANA-1.6B composed W4A4 generation + eval (scripts/rods_a_w4a4_eval.py).
+# Mirrors rods_a_w4a4_eval.yaml; only model + dtype-safe matmul + output namespace
+# differ. The recipe (quant: rods_a_w4a4) is UNCHANGED — SANA runs the same knobs;
+# only the skip set is re-derived inside select_act_targets(model_type="sana") and
+# rotation stays "pad" (SA0.3: 2240=35·2^6 has no native-width Hadamard factor).
+defaults:
+  - paths: local
+  - quant: rods_a_w4a4
+  - _self_
+
+model_type: sana
+model_id: null                     # null -> SANA registry default (Sana_1600M_1024px_BF16)
+device: cuda:0
+
+output_dir: ${paths.outputs_root}/rods_a_w4a4_sana
+mjhq_dir: ${paths.mjhq5k}           # shared svdquant MJHQ-5k split (same as PixArt/ablation)
+ablation_tag: uniform              # namespaces output dir + wandb run
+
+num_samples: 16                    # SANITY default; SA3 full run sets 1000 (dev) / 5000 (eval)
+num_inference_steps: null          # null -> SANA default (20)
+guidance_scale: null               # null -> SANA default (4.5)
+height: 1024
+width: 1024
+max_sequence_length: 300
+seed: 42                        # matches SVDQuant / deepcompressor
+
+# Gating flags (sanity defaults; SA3 flips fid/ir on)
+contact_sheet: true
+capture_sqnr: true
+capture_dtype: float32             # SQNR reference-copy dtype (float16 halves memory)
+install_ffn_conv: false            # true => also quantize the GLUMBConv 1x1 pointwise
+                                   # convs (RoDSAW4A4Conv1x1; diagnostic runs only)
+compute_fid: false
+compute_ir: false
+strict_rho: false                  # collect every layer's rho (gate lives in SA1 audit)
+
+# SANA is bf16; force fp32 host matmul so the sanity check is not confounded by
+# fp16 overflow (bf16 activation range exceeds fp16). Isolates genuine W4A4 quant
+# breakage — the purpose of the SA2 composition gate.
+matmul_fp32: true
+
+overwrite: false
+quant_enabled: true                # false => 16-bit reference arm (skip install_w4a4)
+use_wandb: false
+
+compute_clip: false                # per-prompt CLIP (torchmetrics CLIPScore)
+clip_model_id: openai/clip-vit-large-patch14
+
+# --- RTN/NF4 baseline cells (naive-W4A4 table) ---
+# In-place fake-quant of the act-target weights BEFORE install; requires
+# +quant.weight_quant_enabled=false (A4-only wrapper) so weights are not
+# double-quantized. null = off (existing runs bit-identical).
+baseline_weight_method: null       # null | rtn | nf4
+baseline_weight_bits: 4            # nf4 requires 4 (fixed format; no W3 NF4)

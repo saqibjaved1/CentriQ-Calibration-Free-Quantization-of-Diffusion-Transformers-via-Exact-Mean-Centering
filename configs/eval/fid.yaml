@@ -1,0 +1,18 @@
+# MJHQ-style FID smoke / sweep config.
+
+name: fid
+num_samples_per_category: 5
+categories:
+  - animals
+  - art
+  - fashion
+  - food
+  - landscape
+methods:
+  - fp16
+  - sinq
+  - hqq
+  - rtn
+mjhq_source: mjhq30k
+skip_fid: false
+skip_generation: false

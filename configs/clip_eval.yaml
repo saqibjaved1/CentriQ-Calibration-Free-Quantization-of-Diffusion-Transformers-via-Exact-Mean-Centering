@@ -1,0 +1,35 @@
+# Top-level config for scripts/clip_eval.py.
+#
+# Computes CLIP score (cosine similarity between image and prompt embeddings)
+# for pre-generated method outputs on MJHQ-5K.  Reads the existing
+# eval_results.json in pregenerated_dir (if present) and adds/updates
+# the "clip" key.
+#
+# Run with:  python scripts/clip_eval.py pregenerated_dir=...
+
+defaults:
+  - paths: rcp
+  - _self_
+
+pregenerated_dir: ???                  # required
+mjhq_dir: ${paths.mjhq5k}
+
+# Method labels to score. null → auto-discover (any subdir with images/).
+methods: null
+
+# Maximum prompt-image pairs per method.
+num_samples: 5000
+
+# Also score the original MJHQ images (upper-bound baseline).
+score_reference: true
+
+# Output JSON. null → {pregenerated_dir}/eval_results.json (read-modify-write).
+output_file: null
+
+device: cuda:0
+
+# CLIP backbone (HuggingFace model id).
+model_id: openai/clip-vit-large-patch14
+
+# Overwrite existing "clip" entry in eval_results.json without prompting.
+force: false

@@ -1,0 +1,5 @@
+# CLIP text-image alignment score.
+
+name: clip
+num_samples: 5000
+clip_model: openai/clip-vit-large-patch14

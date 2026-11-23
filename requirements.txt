@@ -1,0 +1,27 @@
+# Versions used for the paper (Python 3.11, CUDA 12.8). Newer versions usually work.
+torch==2.10.0
+triton==3.6.0
+diffusers==0.36.0
+transformers>=4.41.2,<5.0.0
+accelerate>=1.12.0
+huggingface_hub>=0.36
+safetensors>=0.7.0
+sentencepiece          # T5 tokenizer (PixArt-Sigma, FLUX)
+protobuf
+hydra-core==1.3.2
+omegaconf>=2.3.0
+numpy
+scipy
+pillow
+pyyaml
+tqdm
+einops
+
+# Evaluation
+clean-fid==0.1.35      # FID
+image-reward           # ImageReward
+lpips                  # LPIPS
+torchmetrics           # optional CLIP score (compute_clip=true)
+
+# Tests
+pytest
