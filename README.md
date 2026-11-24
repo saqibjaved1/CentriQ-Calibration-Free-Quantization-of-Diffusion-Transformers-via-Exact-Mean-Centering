@@ -3,8 +3,7 @@
 **Nataša Jovanović<sup>1,2</sup>, Mathieu Salzmann<sup>2</sup>, Saqib Javed<sup>2</sup>**
 <sup>1</sup>Tenstorrent · <sup>2</sup>EPFL
 
-[![Website](https://img.shields.io/badge/Project-Website-87CEEB)](https://saqibjaved1.github.io/CentriQ-Calibration-Free-Quantization-of-Diffusion-Transformers-via-Exact-Mean-Centering/)
-[![arXiv](https://img.shields.io/badge/arXiv-Paper-FFF933)](https://arxiv.org/abs/2610.06260)
+[Paper (arXiv:2610.06260)](https://arxiv.org/abs/2610.06260) · [Project page](https://saqibjaved1.github.io/CentriQ-Calibration-Free-Quantization-of-Diffusion-Transformers-via-Exact-Mean-Centering/) · [Code](https://github.com/saqibjaved1/CentriQ-Calibration-Free-Quantization-of-Diffusion-Transformers-via-Exact-Mean-Centering)
 
 CentriQ quantizes the weights and activations of diffusion transformers to 4 bits **without any
 calibration data**. Adaptive LayerNorm adds a per-token mean to DiT activations, and a Hadamard
@@ -30,6 +29,7 @@ weights (W2A4).
 ## Install
 
 ```bash
+git clone https://github.com/saqibjaved1/CentriQ-Calibration-Free-Quantization-of-Diffusion-Transformers-via-Exact-Mean-Centering.git centriq && cd centriq
 conda create -n centriq python=3.11 -y && conda activate centriq
 pip install -r requirements.txt
 ```
@@ -110,12 +110,18 @@ configs/                Hydra configs (eval, model, paths, quant)
 reproduce/              one script per paper table
 latency/                fused INT4 engine for the latency table (needs Nunchaku)
 tests/                  unit tests (pytest tests/)
-docs/                   project page (index.html, v2.html draft, assets/)
+docs/                   project page (index.html, assets/)
 tools/page/             scripts used to build the project page figures and comparisons
 ```
 
 Module names (`rods_a`, `rods`) follow our internal naming: RoDS is the weight quantizer and
 `rods_a` is its activation-side companion, which together form CentriQ.
+
+## Project page
+
+The page in `docs/` is a static site with no build step. Preview it with
+`python3 -m http.server -d docs 8000`. To publish it, open the repository settings and choose
+**Pages → Deploy from a branch → `main` / `/docs`**.
 
 ## Tests
 

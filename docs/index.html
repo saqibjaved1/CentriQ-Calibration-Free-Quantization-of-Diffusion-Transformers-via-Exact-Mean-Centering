@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<script>try{var t=localStorage.getItem("centriq-theme");document.documentElement.dataset.theme=(t==="light"||t==="dark")?t:"dark";}catch(e){}</script>
 <style>
 :root{
   --ink:#0d1b1e; --ink-2:#3a4a4f; --muted:#6b7b80; --line:#e3e8ea;
@@ -95,6 +96,7 @@ section.alt .tabs{background:var(--card)}
 .tab{border:0;background:transparent;color:var(--ink-2);font:600 14px Inter;padding:9px 16px;border-radius:999px;cursor:pointer}
 .tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
 .tab{white-space:nowrap}
+@media (max-width:600px){.tabs{flex-wrap:wrap;border-radius:16px;max-width:100%}}
 @media (max-width:600px){
   .tab{padding:8px 11px;font-size:13px}
   .vs{flex-wrap:wrap}
@@ -157,7 +159,7 @@ tr.ref td{color:var(--muted)}
 td.bad{color:#b8473b}
 .pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:1px}
 .pill.y{background:#fde8e6;color:#a8382c}.pill.n{background:#e3f4ea;color:#21794a}
-:root[data-theme="dark"] .pill.y,:root:not([data-theme="light"]) .pill.y{}
+:root[data-theme="dark"] .pill.y{background:#3a1c18;color:#f3a297}:root[data-theme="dark"] .pill.n{background:#15301f;color:#8fd8aa}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.y{background:#3a1c18;color:#f3a297}:root:not([data-theme="light"]) .pill.n{background:#15301f;color:#8fd8aa}}
 
 /* ---------- latency bars ---------- */
@@ -183,9 +185,76 @@ footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border
 .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
 .reveal.in{opacity:1;transform:none}
 @media (prefers-reduced-motion: reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+/* ---------- v2: diagram + charts ---------- */
+:root{--gray-mark:#9aa9ad;--grid:#e6ebec;--tip-bg:#0d1b1e;--tip-ink:#f2f6f6}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--gray-mark:#6f8287;--grid:#1f3036;--tip-bg:#e8eef0;--tip-ink:#0d1b1e}}
+:root[data-theme="dark"]{--gray-mark:#6f8287;--grid:#1f3036;--tip-bg:#e8eef0;--tip-ink:#0d1b1e}
+.diagram{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 10px;overflow-x:auto}
+.diagram svg{display:block;width:100%;min-width:720px;height:auto;font-family:Inter,system-ui,sans-serif}
+.dg-lane{fill:var(--bg-2);stroke:var(--line)}
+.dg-lane-l{font-size:12px;font-style:italic;fill:var(--muted)}
+.dg-box{fill:var(--card);stroke-width:1.6;rx:10}
+.dg-box.q{stroke:var(--int4)} .dg-box.fp{stroke:var(--accent)} .dg-box.io{stroke:var(--ink-2)}
+.dg-t{font-size:14px;fill:var(--ink);text-anchor:middle;dominant-baseline:middle}
+.dg-s{font-size:11.5px;fill:var(--muted);text-anchor:middle;dominant-baseline:middle}
+.dg-v{font-size:15px;fill:var(--ink);font-style:italic}
+.dg-w{stroke:var(--int4);stroke-width:2;fill:none}
+.dg-io{stroke:var(--ink-2);stroke-width:1.6;fill:none}
+.dg-fp{stroke:var(--accent);stroke-width:2;fill:none;stroke-dasharray:7 6;animation:dgflow 1.4s linear infinite}
+.dg-pulse{fill:var(--int4)} .dg-pulse.fp{fill:var(--accent)}
+@keyframes dgflow{to{stroke-dashoffset:-26}}
+@media (prefers-reduced-motion: reduce){.dg-fp{animation:none}.dg-pulse{display:none}}
+.dg-legend{display:flex;gap:22px;flex-wrap:wrap;font-size:13px;color:var(--ink-2);margin:6px 4px 4px}
+.dg-legend i{display:inline-block;width:22px;height:0;border-top:2px solid;margin-right:8px;vertical-align:middle}
+.chart-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.chart-head h3{font-size:16px;margin:0}
+.chart-head p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.multiples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:8px}
+@media (max-width:820px){.multiples{grid-template-columns:1fr}}
+.multiples svg{width:100%;height:auto;display:block;overflow:visible;font-family:Inter,system-ui,sans-serif}
+.panel-t{font-size:13px;font-weight:600;fill:var(--ink)}
+.ax{font-size:11px;fill:var(--muted)}
+.lbl{font-size:12px;fill:var(--ink-2)}
+.val{font-size:11.5px;fill:var(--ink);font-variant-numeric:tabular-nums}
+.gridl{stroke:var(--grid);stroke-width:1}
+.refl{stroke:var(--ink-2);stroke-width:1.5;stroke-dasharray:4 4}
+.hit{fill:transparent;cursor:default}
+.hit:focus{outline:none}
+.mk{transition:r .12s}
+g.row:hover .mk, g.row:focus-within .mk{r:7}
+.chart-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.chart-legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0;background:var(--c)}
+.tip{position:fixed;pointer-events:none;background:var(--tip-bg);color:var(--tip-ink);font:12px/1.4 Inter,sans-serif;padding:8px 10px;border-radius:8px;z-index:50;opacity:0;transition:opacity .1s;max-width:240px}
+.tip b{font-size:14px;display:block}
+.linkbtn{border:1px solid var(--line);background:var(--bg-2);color:var(--ink-2);font:600 12.5px Inter;padding:6px 11px;border-radius:999px;cursor:pointer}
+/* ---------- method: more color ---------- */
+#method .step{--sc:var(--int4);--ss:var(--int4-soft);background:linear-gradient(180deg,var(--ss),var(--card) 75%);border:1px solid color-mix(in srgb,var(--sc) 30%,var(--line));border-top:4px solid var(--sc);box-shadow:0 14px 34px -24px color-mix(in srgb,var(--sc) 70%,transparent)}
+#method .step.c,#method .step.q{--sc:var(--accent);--ss:var(--accent-soft)}
+#method .step h3{color:var(--sc)}
+#method .step .n{background:var(--sc);color:#fff}
+#method .eq{background:linear-gradient(90deg,var(--int4-soft),var(--card) 45%,var(--card) 60%,var(--accent-soft));border-color:color-mix(in srgb,var(--int4) 25%,var(--line))}
+#method .dg-box.q{fill:var(--int4-soft)} #method .dg-box.fp{fill:var(--accent-soft)}
+#method .dg-lane{fill:color-mix(in srgb,var(--int4) 5%,var(--card));stroke:color-mix(in srgb,var(--int4) 25%,var(--line))}
+#method .dg-lane.off{fill:color-mix(in srgb,var(--accent) 5%,var(--card));stroke:color-mix(in srgb,var(--accent) 25%,var(--line))}
+#method .dg-lane-l{fill:var(--ink-2);font-weight:600}
+.theme-tg{position:fixed;top:16px;right:16px;z-index:60;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  border:1px solid rgba(255,255,255,.22);background:rgba(10,24,27,.55);color:#e8eef0;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 6px 18px -8px rgba(0,0,0,.5);transition:transform .15s}
+.theme-tg:hover{transform:scale(1.07)} .theme-tg:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.theme-tg svg{width:19px;height:19px} .theme-tg .sun{display:none}
+:root[data-theme="dark"] .theme-tg .sun{display:block} :root[data-theme="dark"] .theme-tg .moon{display:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .theme-tg .sun{display:block}:root:not([data-theme="light"]) .theme-tg .moon{display:none}}
+.loops{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:18px}
+.loops video{width:100%;border-radius:12px;display:block;background:#071518}
+.loops figure{margin:0}
+@media (max-width:820px){.loops{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<button class="theme-tg" id="themeTg" type="button" aria-label="Switch between light and dark mode" title="Light / dark">
+  <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+  <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+</button>
 
 <!-- ================= HERO ================= -->
 <header class="hero">
@@ -203,7 +272,9 @@ footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border
   <div class="btns">
     <a class="btn" href="https://arxiv.org/pdf/2610.06260"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Paper</a>
     <a class="btn ghost" href="https://arxiv.org/abs/2610.06260"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l16 16M20 4L4 20"/></svg>arXiv</a>
-    <a class="btn ghost" href="#" aria-disabled="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>Code <span class="soon">soon</span></a>
+    <a class="btn ghost" href="https://github.com/saqibjaved1/CentriQ-Calibration-Free-Quantization-of-Diffusion-Transformers-via-Exact-Mean-Centering" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>Code</a>
+    <a class="btn ghost" href="assets/slides/centriq_talk.pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Slides</a>
+    <a class="btn ghost" href="#video"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/></svg>Video</a>
     <a class="btn ghost" href="#bibtex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h4v4H7zM13 7h4v4h-4zM7 11c0 3-1 5-3 6M13 11c0 3-1 5-3 6"/></svg>BibTeX</a>
   </div>
   <div class="scroll-cue">Scroll</div>
@@ -220,6 +291,27 @@ footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border
 </div>
 
 <!-- ================= COMPARISON ================= -->
+<section id="video">
+  <div class="wrap">
+    <div class="narrow center reveal">
+      <div class="eyebrow">Introductory video</div>
+      <h2>CentriQ in five minutes</h2>
+    </div>
+    <div class="reveal" style="margin-top:28px">
+      <video controls preload="metadata" playsinline poster="assets/video/centriq_intro_poster.jpg"
+             style="width:100%;border-radius:var(--radius);background:#000;display:block">
+        <source src="assets/video/centriq_intro.mp4" type="video/mp4">
+        <track kind="captions" src="assets/video/centriq_intro.vtt" srclang="en" label="English">
+      </video>
+    </div>
+    <div class="loops reveal">
+      <figure><video autoplay muted loop playsinline preload="metadata" src="assets/video/mean_spike.mp4" aria-label="Animation: rotation leaves a spike that sets the 4-bit grid; centering removes it"></video><figcaption class="caption">The hidden mean, and what centering does to the 4-bit grid (illustration).</figcaption></figure>
+      <figure><video autoplay muted loop playsinline preload="metadata" src="assets/video/method_flow.mp4" aria-label="Animation: one CentriQ layer, with the mean bypassing both quantizers"></video><figcaption class="caption">One layer: the mean bypasses both quantizers.</figcaption></figure>
+      <figure><video autoplay muted loop playsinline preload="metadata" poster="assets/video/compare_wipe_poster.jpg" src="assets/video/compare_wipe.mp4" aria-label="Animation: wipes from other 4-bit methods to CentriQ on the same prompt and seed"></video><figcaption class="caption">Same prompt and seed: other methods, then CentriQ.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
 <section id="compare">
   <div class="wrap">
     <div class="narrow center reveal">
@@ -232,6 +324,7 @@ footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border
       <div class="tabs" role="tablist" aria-label="Model">
         <button class="tab" role="tab" data-model="pixart" aria-selected="true">PixArt-Σ</button>
         <button class="tab" role="tab" data-model="flux" aria-selected="false">FLUX.1-schnell</button>
+        <button class="tab" role="tab" data-model="fluxa2" aria-selected="false">FLUX W4A2</button>
         <button class="tab" role="tab" data-model="sana" aria-selected="false">SANA-1.6B</button>
       </div>
       <div class="vs">Compare CentriQ with
@@ -246,13 +339,13 @@ footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border
           <img id="imgR" class="top" alt="">
           <div class="handle"><div class="knob">⇆</div></div>
           <span class="lbl l" id="lblL">BF16</span>
-          <span class="lbl r ours">CentriQ W4A4</span>
+          <span class="lbl r ours" id="lblR">CentriQ W4A4</span>
         </div>
         <div class="triple" id="triple"></div>
       </div>
       <div class="thumbs" id="thumbs"></div>
     </div>
-    <p class="caption">All methods use 4-bit weights and activations. ConvRot-style, HadaNorm-style and rotation-only replace CentriQ's activation path with the same RoDS weights, grid and clip (our reimplementations, as in the paper's controlled comparison). SVDQuant is calibrated on COCO prompts and keeps a 16-bit low-rank branch; on FLUX.1-schnell we use its official public checkpoint (NVFP4), on SANA-1.6B its reported setup. CentriQ uses no data. FLUX.1-schnell runs 4 steps; SANA-1.6B and PixArt-Σ run 20.</p>
+    <p class="caption">Unless a tab says W4A2, all methods use 4-bit weights and activations. ConvRot-style, HadaNorm-style and rotation-only are our reimplementations of those activation transforms, swapped into CentriQ's path with the same RoDS weights, grid and clip. SVDQuant is calibrated on COCO prompts and keeps a 16-bit low-rank branch; on FLUX.1-schnell we use its official public checkpoint (NVFP4), on SANA-1.6B its reported setup. CentriQ uses no data. The FLUX W4A2 tab uses 2-bit activations with simulated quantization; there its ConvRot-style uses order-256 blocks, matching the paper's setting. FLUX.1-schnell runs 4 steps; SANA-1.6B and PixArt-Σ run 20.</p>
   </div>
 </section>
 
@@ -270,6 +363,15 @@ footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border
         <div class="figimg"><img src="assets/img/fig_collapse.png" alt="W4A4 samples from FP16, RTN, HQQ and CentriQ on PixArt-Sigma, FLUX.1-schnell and SANA-1.6B. RTN and HQQ produce noise or lose the prompt; CentriQ matches FP16." loading="lazy"></div>
         <figcaption class="caption">W4A4 with calibration-free quantizers. RTN and HQQ break; CentriQ matches the 16-bit image.</figcaption>
       </figure>
+    </div>
+    <div class="chart-card reveal" style="margin-top:40px">
+      <div class="chart-head">
+        <div><h3>W4A4 image quality, MJHQ FID (lower is better, log scale)</h3>
+        <p>Dashed line: the 16-bit model. Hover a dot for its value.</p></div>
+        <div class="chart-legend"><span style="--c:var(--gray-mark)">RTN, NF4, HQQ (no data)</span><span style="--c:var(--int4)">SVDQuant (calibrated)</span><span style="--c:var(--accent)">CentriQ (no data)</span></div>
+      </div>
+      <div class="multiples" id="fidChart" role="img" aria-label="Dot plot of W4A4 FID per method for PixArt-Sigma, FLUX.1-schnell and SANA-1.6B"></div>
+      <p class="caption" style="margin-bottom:0">Values from the paper's main W4A4 table; SVDQuant numbers as reported by its authors.</p>
     </div>
   </div>
 </section>
@@ -321,7 +423,52 @@ footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border
     <p class="caption center reveal"><span class="key" style="background:var(--int4)"></span>4-bit path &nbsp;&nbsp; <span class="key" style="background:var(--accent)"></span>full-precision rank-1 branch, which bypasses both quantizers</p>
 
     <figure class="reveal" style="margin-top:36px">
-      <div class="figimg"><img src="assets/img/layer_dataflow.png" alt="Dataflow of one CentriQ linear layer: online per-token centering, padding and rotation, INT4 quantization and GEMM; offline l_p weight solver; full-precision rank-1 branch from the mean and the row sums of W." loading="lazy"></div>
+      <div class="diagram">
+        <svg viewBox="0 0 980 370" role="img" aria-label="One CentriQ linear layer. Online, per token: x is centered, padded and rotated, quantized to INT4 with a closed-form scale, and multiplied in an INT4 GEMM; the epilogue adds the mean times W times one plus the bias. Offline: W is fitted by the l_p solver into a packed INT4 rotated weight, and its row sums W1 are stored in full precision.">
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker></defs>
+          <rect class="dg-lane" x="8" y="8" width="964" height="160" rx="14"/>
+          <text class="dg-lane-l" x="958" y="30" text-anchor="end">online · per token, at inference</text>
+          <rect class="dg-lane off" x="8" y="196" width="700" height="166" rx="14"/>
+          <text class="dg-lane-l" x="24" y="218">offline · once, before deployment</text>
+
+          <!-- online path -->
+          <text class="dg-v" x="24" y="110">x<tspan baseline-shift="sub" font-size="11">t</tspan></text>
+          <path class="dg-io" d="M46 105H92" marker-end="url(#ah)"/>
+          <rect class="dg-box fp" x="96" y="80" width="112" height="50"/><text class="dg-t" x="152" y="99">center</text><text class="dg-s" x="152" y="118">− x̄<tspan baseline-shift="sub" font-size="9">t</tspan>·1</text>
+          <path class="dg-w" d="M208 105H262" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="266" y="80" width="140" height="50"/><text class="dg-t" x="336" y="99">pad · rotate H</text><text class="dg-s" x="336" y="118">H<tspan baseline-shift="sub" font-size="9">m</tspan> ⊗ H<tspan baseline-shift="sub" font-size="9">2ᵏ</tspan></text>
+          <path class="dg-w" d="M406 105H460" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="464" y="80" width="150" height="50"/><text class="dg-t" x="539" y="99">quantize · INT4</text><text class="dg-s" x="539" y="118">closed-form, per token</text>
+          <path class="dg-w" d="M614 105H668" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="672" y="80" width="110" height="50"/><text class="dg-t" x="727" y="99">INT4 GEMM</text><text class="dg-s" x="727" y="118">Ŵ<tspan baseline-shift="sub" font-size="9">R</tspan> · Q(·)</text>
+          <path class="dg-w" d="M782 105H812" marker-end="url(#ah)"/>
+          <rect class="dg-box io" x="816" y="80" width="112" height="50"/><text class="dg-t" x="872" y="99">epilogue</text><text class="dg-s" x="872" y="118">+ x̄<tspan baseline-shift="sub" font-size="9">t</tspan>w₁ + b</text>
+          <path class="dg-io" d="M928 105H946" marker-end="url(#ah)"/>
+          <text class="dg-v" x="950" y="110">y<tspan baseline-shift="sub" font-size="11">t</tspan></text>
+
+          <!-- mean bypass -->
+          <path id="pMean" class="dg-fp" d="M152 80V50H872V76" marker-end="url(#ah)"/>
+          <text class="dg-s" x="512" y="42" style="fill:var(--accent);font-weight:600">x̄<tspan baseline-shift="sub" font-size="9">t</tspan> · full precision, bypasses both quantizers</text>
+
+          <!-- offline path -->
+          <text class="dg-v" x="24" y="282">W</text>
+          <path class="dg-io" d="M44 277H92" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="96" y="252" width="160" height="50"/><text class="dg-t" x="176" y="271">ℓ<tspan baseline-shift="sub" font-size="9">p</tspan> solver (RoDS)</text><text class="dg-s" x="176" y="290">p = 0.7 · groups of 64</text>
+          <path class="dg-w" d="M256 277H330" marker-end="url(#ah)"/>
+          <rect class="dg-box q" x="334" y="252" width="170" height="50"/><text class="dg-t" x="419" y="271">Ŵ<tspan baseline-shift="sub" font-size="9">R</tspan> ≈ W Pᵀ Hᵀ</text><text class="dg-s" x="419" y="290">INT4, packed</text>
+          <path id="pW" class="dg-w" d="M504 277H727V134" marker-end="url(#ah)"/>
+          <path class="dg-io" d="M60 277V334H92" marker-end="url(#ah)"/>
+          <rect class="dg-box fp" x="96" y="316" width="130" height="36"/><text class="dg-t" x="161" y="334">w₁ = W·1</text>
+          <path id="pW1" class="dg-fp" d="M226 334H900V134" marker-end="url(#ah)"/>
+
+          <!-- moving pulses along the paths -->
+          <circle class="dg-pulse" r="4"><animateMotion dur="3.2s" repeatCount="indefinite" path="M46 105H946"/></circle>
+          <circle class="dg-pulse fp" r="4"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#pMean"/></animateMotion></circle>
+          <circle class="dg-pulse" r="3.5"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#pW"/></animateMotion></circle>
+          <circle class="dg-pulse fp" r="3.5"><animateMotion dur="4.6s" repeatCount="indefinite"><mpath href="#pW1"/></animateMotion></circle>
+        </svg>
+        <div class="dg-legend"><span><i style="border-color:var(--int4)"></i>INT4 path</span><span><i style="border-color:var(--accent);border-top-style:dashed"></i>full precision (rank-1 branch)</span><span><i style="border-color:var(--ink-2)"></i>input / output</span></div>
+      </div>
       <figcaption class="caption">One quantized linear layer. Weights are fitted offline under a robust $\ell_p$ objective ($p=0.7$) that tracks the dense mode of each group instead of its heavy tail. Nothing in either path sees data.</figcaption>
     </figure>
   </div>
@@ -388,7 +535,15 @@ footer{padding:40px 0;font-size:13px;color:var(--muted);text-align:center;border
       <figcaption class="caption">GenEval prompts on FLUX.1-schnell. Marks give the verdict of the GenEval detector. 2-bit settings use simulated quantization, since no fused kernel yet supports 2-bit activations.</figcaption>
     </figure>
 
-    <div class="tbl-wrap reveal" style="margin-top:44px">
+    <div class="chart-card reveal" style="margin-top:44px">
+      <div class="chart-head">
+        <div><h3>What each component buys, FLUX.1-schnell, MJHQ FID (log scale)</h3>
+        <p>Each step adds one component. Dashed line: BF16 (19.45). Hover a point for its value.</p></div>
+        <button class="linkbtn" id="ablToggle" aria-expanded="false" aria-controls="ablTable">Show table</button>
+      </div>
+      <div class="multiples" id="ablChart" role="img" aria-label="FID after each added component at W4A4, W4A2 and W2A4"></div>
+    </div>
+    <div class="tbl-wrap reveal" id="ablTable" hidden style="margin-top:14px">
       <table>
         <thead><tr><th>FLUX.1-schnell, MJHQ FID ↓</th><th>W4A4</th><th>W4A2</th><th>W2A4</th></tr></thead>
         <tbody>
@@ -433,6 +588,8 @@ const cmp2 = m => (i,k) => `assets/img/cmp2/${m}_${i}_${k}.jpg`;
 const SETS = {
   pixart: {ref:"FP16", methods:["convrot","hadanorm","rot"], items:[377,4,998,853,658,206], src:cmp2("pixart")},
   flux:   {ref:"BF16", methods:["svd","convrot","hadanorm","rot"], items:[169,848,814,124,916,384], src:cmp2("flux")},
+  // FLUX, 2-bit activations (simulated). ConvRot-style uses order-256 regular blocks, as in the paper.
+  fluxa2: {ref:"BF16", bits:"W4A2", methods:["convrot","rot"], items:[10,82,201,189,0,97], src:cmp2("fluxa2")},
   sana:   {ref:"BF16", methods:["svd"], items:[0,1,2,3],
            src:(r,k)=>`assets/img/cmp/sana_r${r}_c${{ref:0,centriq:1,svd:2}[k]}.jpg`}
 };
@@ -447,7 +604,8 @@ function renderCompare(){
   $$("#leftTabs .tab").forEach(b=>b.onclick=()=>{left=b.dataset.left;renderCompare();});
   $("#imgL").src = s.src(row,left); $("#imgL").alt = label(left)+" sample";
   $("#imgR").src = s.src(row,"centriq"); $("#imgR").alt="CentriQ W4A4 sample";
-  $("#lblL").textContent = left==="ref" ? s.ref : label(left)+" W4A4";
+  $("#lblL").textContent = left==="ref" ? s.ref : label(left)+" "+(s.bits||"W4A4");
+  $("#lblR").textContent = "CentriQ "+(s.bits||"W4A4");
   $("#thumbs").innerHTML = s.items.map((r,n)=>`<button class="thumb" aria-pressed="${r===row}" data-row="${r}" aria-label="Prompt ${n+1}"><img src="${s.src(r,"centriq")}" alt="" loading="lazy"></button>`).join("");
   $$("#thumbs .thumb").forEach(b=>b.onclick=()=>{row=+b.dataset.row;renderCompare();});
   const strip=["ref","centriq",...s.methods];
@@ -563,6 +721,85 @@ $("#copyBib").onclick=async()=>{try{await navigator.clipboard.writeText($("#bibT
 
 /* math */
 addEventListener("load",()=>{ if(window.renderMathInElement) renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],trust:true,strict:false}); });
+
+/* ---------------- v2 charts ---------------- */
+(function(){
+  const NS="http://www.w3.org/2000/svg";
+  const el=(t,a={},txt)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;};
+  const tip=document.createElement("div");tip.className="tip";tip.setAttribute("role","tooltip");document.body.appendChild(tip);
+  function showTip(evt,val,label){tip.replaceChildren();const b=document.createElement("b");b.textContent=val;const s=document.createElement("span");s.textContent=label;tip.append(b,s);
+    const r=(evt.currentTarget||evt.target).getBoundingClientRect();const x=evt.clientX||r.left+r.width/2,y=evt.clientY||r.top;
+    tip.style.left=Math.min(innerWidth-250,x+12)+"px";tip.style.top=(y-48)+"px";tip.style.opacity=1;}
+  const hideTip=()=>tip.style.opacity=0;
+  const logx=(v,lo,hi,a,b)=>a+(Math.log10(v)-Math.log10(lo))/(Math.log10(hi)-Math.log10(lo))*(b-a);
+  const fmt=v=>v>=100?v.toFixed(0):v.toFixed(1);
+
+  /* Chart A: W4A4 FID dot plot, one panel per model */
+  const FID={"PixArt-Σ":{ref:["FP16",16.7],rows:[["RTN",481.5,"g"],["NF4",479.6,"g"],["HQQ",462.6,"g"],["SVDQuant",19.2,"s"],["CentriQ",19.1,"c"]]},
+             "FLUX.1-schnell":{ref:["BF16",19.5],rows:[["RTN",43.9,"g"],["NF4",41.3,"g"],["HQQ",40.9,"g"],["SVDQuant",18.3,"s"],["CentriQ",18.8,"c"]]},
+             "SANA-1.6B":{ref:["BF16",16.0],rows:[["RTN",33.3,"g"],["NF4",33.3,"g"],["HQQ",33.2,"g"],["SVDQuant",19.3,"s"],["CentriQ",16.2,"c"]]}};
+  const COL={g:"var(--gray-mark)",s:"var(--int4)",c:"var(--accent)"};
+  const NOTE={g:"no calibration data",s:"calibrated",c:"no calibration data"};
+  const fc=document.getElementById("fidChart");
+  if(fc) for(const [model,d] of Object.entries(FID)){
+    const W=320,H=196,L=74,R=304,T=34,rowH=28,lo=10,hi=1000;
+    const svg=el("svg",{viewBox:`0 0 ${W} ${H}`});
+    svg.append(el("text",{x:0,y:14,class:"panel-t"},model));
+    for(const t of [10,30,100,300,1000]){const x=logx(t,lo,hi,L,R);svg.append(el("line",{x1:x,x2:x,y1:T-6,y2:T+rowH*5-8,class:"gridl"}));svg.append(el("text",{x,y:T+rowH*5+8,class:"ax","text-anchor":"middle"},t));}
+    const rx=logx(d.ref[1],lo,hi,L,R);
+    svg.append(el("line",{x1:rx,x2:rx,y1:T-12,y2:T+rowH*5-8,class:"refl"}));
+    svg.append(el("text",{x:rx+4,y:T-14,class:"ax"},`${d.ref[0]} ${d.ref[1]}`));
+    d.rows.forEach(([name,v,k],i)=>{
+      const y=T+i*rowH+6, x=logx(v,lo,hi,L,R), g=el("g",{class:"row"});
+      g.append(el("text",{x:L-10,y:y+4,class:"lbl","text-anchor":"end","font-weight":k==="c"?"700":"400"},name));
+      g.append(el("line",{x1:L,x2:x,y1:y,y2:y,stroke:COL[k],"stroke-width":2,"stroke-linecap":"round",opacity:.35}));
+      g.append(el("circle",{cx:x,cy:y,r:5,fill:COL[k],stroke:"var(--card)","stroke-width":2,class:"mk"}));
+      const right=x>R-34; g.append(el("text",{x:right?x-10:x+10,y:y+4,class:"val","text-anchor":right?"end":"start"},fmt(v)));
+      const hit=el("rect",{x:0,y:y-rowH/2,width:W,height:rowH,class:"hit",tabindex:0});
+      hit.addEventListener("pointermove",e=>showTip(e,fmt(v),`${name} · ${model} · ${NOTE[k]}`));hit.addEventListener("focus",e=>showTip(e,fmt(v),`${name} · ${model} · ${NOTE[k]}`));
+      hit.addEventListener("pointerleave",hideTip);hit.addEventListener("blur",hideTip);
+      g.append(hit); svg.append(g);
+    });
+    fc.append(svg);
+  }
+
+  /* Chart B: ablation small multiples */
+  const STEPS=["None","+ rotation","+ centering","+ clip"];
+  const ABL={"W4A4":[40.62,25.65,18.46,18.80],"W4A2":[437.41,455.30,444.21,35.59],"W2A4":[363.14,35.84,21.81,21.56]};
+  const ac=document.getElementById("ablChart");
+  if(ac) for(const [bits,vals] of Object.entries(ABL)){
+    const W=320,H=230,L=40,R=300,T=30,B=186,lo=10,hi=1000;
+    const y=v=>B-(Math.log10(v)-1)/(Math.log10(hi)-1)*(B-T);
+    const x=i=>L+12+i*((R-L-24)/3);
+    const svg=el("svg",{viewBox:`0 0 ${W} ${H}`});
+    svg.append(el("text",{x:0,y:14,class:"panel-t"},bits));
+    for(const t of [10,30,100,300,1000]){svg.append(el("line",{x1:L,x2:R,y1:y(t),y2:y(t),class:"gridl"}));svg.append(el("text",{x:L-6,y:y(t)+4,class:"ax","text-anchor":"end"},t));}
+    svg.append(el("line",{x1:L,x2:R,y1:y(19.45),y2:y(19.45),class:"refl"}));
+    svg.append(el("path",{d:vals.map((v,i)=>`${i?"L":"M"}${x(i)} ${y(v)}`).join(""),fill:"none",stroke:"var(--ink-2)","stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"}));
+    vals.forEach((v,i)=>{
+      const last=i===3, g=el("g",{class:"row"});
+      g.append(el("circle",{cx:x(i),cy:y(v),r:last?6:4.5,fill:last?"var(--accent)":"var(--ink-2)",stroke:"var(--card)","stroke-width":2,class:"mk"}));
+      if(i===0||last) g.append(el("text",{x:x(i)+(last?-10:10),y:y(v)-10,class:"val","text-anchor":last?"end":"start","font-weight":last?"700":"400"},fmt(v)));
+      g.append(el("text",{x:x(i),y:B+18,class:"ax","text-anchor":"middle"},STEPS[i]));
+      const hit=el("rect",{x:x(i)-30,y:T-10,width:60,height:B-T+20,class:"hit",tabindex:0});
+      const lab=`${bits} · ${STEPS[i]}${last?" = CentriQ":""} · BF16 19.45`;
+      hit.addEventListener("pointermove",e=>showTip(e,v.toFixed(2),lab));hit.addEventListener("focus",e=>showTip(e,v.toFixed(2),lab));
+      hit.addEventListener("pointerleave",hideTip);hit.addEventListener("blur",hideTip);
+      g.append(hit); svg.append(g);
+    });
+    svg.append(el("text",{x:R,y:B+38,class:"ax","text-anchor":"end"},"orange = full CentriQ"));
+    ac.append(svg);
+  }
+  const tg=document.getElementById("ablToggle"), tb=document.getElementById("ablTable");
+  if(tg&&tb) tg.onclick=()=>{const open=tb.hidden; tb.hidden=!open; tg.setAttribute("aria-expanded",open); tg.textContent=open?"Hide table":"Show table"; if(open) tb.classList.add("in");};
+})();
+
+/* ---------------- light / dark toggle ---------------- */
+(()=>{const b=document.getElementById("themeTg"), root=document.documentElement;
+  const isDark=()=>root.dataset.theme ? root.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  b.onclick=()=>{const t=isDark()?"light":"dark"; root.dataset.theme=t; try{localStorage.setItem("centriq-theme",t);}catch(e){} if(typeof drawToken==="function") drawToken();};
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{if(!root.dataset.theme&&typeof drawToken==="function") drawToken();});
+})();
 </script>
 </body>
 </html>
